@@ -2,9 +2,9 @@ package com.example.project_gym.service;
 
 import com.example.project_gym.model.Training;
 import com.example.project_gym.model.dto.dtoin.TrainingDtoIn;
-import com.example.project_gym.repository.TraineeDaoImpl;
-import com.example.project_gym.repository.TrainerDaoImpl;
-import com.example.project_gym.repository.TrainingDaoImpl;
+import com.example.project_gym.repository.idao.ITraineeDAO;
+import com.example.project_gym.repository.idao.ITrainerDAO;
+import com.example.project_gym.repository.idao.ITrainingDAO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -12,13 +12,13 @@ import org.springframework.stereotype.Service;
 public class TrainingService {
 
     @Autowired
-    private TrainingDaoImpl trainingDao;
+    private ITrainingDAO trainingDao;
 
     @Autowired
-    private TrainerDaoImpl trainerDao;
+    private ITrainerDAO trainerDao;
 
     @Autowired
-    private TraineeDaoImpl traineeDao;
+    private ITraineeDAO traineeDao;
 
 
     public Training create(TrainingDtoIn dto) {

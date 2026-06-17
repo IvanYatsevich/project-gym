@@ -4,6 +4,7 @@ import com.example.project_gym.model.Trainee;
 import com.example.project_gym.model.dto.dtoin.TraineeDtoIn;
 import com.example.project_gym.model.dto.dtoupdate.TraineeUpdateDto;
 import com.example.project_gym.repository.TraineeDaoImpl;
+import com.example.project_gym.repository.idao.ITraineeDAO;
 import com.example.project_gym.utilservices.PasswordGenerator;
 import com.example.project_gym.utilservices.UniqueUserNameGenerator;
 import com.example.project_gym.utilservices.UserIdGenerator;
@@ -14,7 +15,7 @@ import org.springframework.stereotype.Service;
 public class TraineeService {
 
     @Autowired
-    private TraineeDaoImpl traineeDao;
+    private ITraineeDAO traineeDao;
     private UserIdGenerator idGenerator;
     private UniqueUserNameGenerator nameGenerator;
     private PasswordGenerator passwordGenerator;
