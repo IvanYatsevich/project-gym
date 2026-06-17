@@ -20,7 +20,7 @@ class ConsoleAppRunnerTest {
 
     @Test
     void run_shouldHandleInputUntilExit() {
-        ConsoleAppRunner runner = new ConsoleAppRunner(commandHandler);
+        ConsoleAppRunner runner = new ConsoleAppRunner(commandHandler, true);
 
         InputStream oldIn = System.in;
         try {
@@ -30,7 +30,7 @@ class ConsoleAppRunnerTest {
             when(commandHandler.handle("hello")).thenReturn("ok");
             when(commandHandler.handle("exit")).thenReturn("exit");
 
-            runner.run();
+            runner.start();
 
             verify(commandHandler).handle("hello");
             verify(commandHandler).handle("exit");
