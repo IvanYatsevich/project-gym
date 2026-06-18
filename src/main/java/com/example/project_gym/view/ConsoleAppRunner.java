@@ -13,7 +13,7 @@ public class ConsoleAppRunner {
     private static final Logger log = LoggerFactory.getLogger(ConsoleAppRunner.class);
 
     private final ConsoleCommandHandler commandHandler;
-    private boolean consoleEnabled;
+    private final boolean consoleEnabled;
 
     public ConsoleAppRunner(ConsoleCommandHandler commandHandler, @Value("${app.console.enabled:true}")
      boolean consoleEnabled) {
