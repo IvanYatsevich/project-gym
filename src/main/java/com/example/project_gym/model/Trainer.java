@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 @Data
@@ -22,7 +23,7 @@ public class Trainer {
     @JoinColumn(name = "training_type_id", nullable = false)
     private TrainingType trainingType;
 
-    @OneToOne
+    @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "user_id")
     private User user;
 
@@ -31,4 +32,7 @@ public class Trainer {
             joinColumns = @JoinColumn(name = "trainer_id"),
             inverseJoinColumns = @JoinColumn(name = "trainee_id"))
     private Set<Trainee> trainees = new HashSet<>();
+
+    @OneToMany(mappedBy = "trainer")
+    private List<Training> trainings;
 }

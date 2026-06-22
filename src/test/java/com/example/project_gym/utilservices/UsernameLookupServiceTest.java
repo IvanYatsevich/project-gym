@@ -1,12 +1,17 @@
 package com.example.project_gym.utilservices;
 
-import com.example.project_gym.repository.TraineeDaoImpl;
-import com.example.project_gym.repository.TrainerDaoImpl;
+import com.example.project_gym.model.Trainee;
+import com.example.project_gym.model.Trainer;
+import com.example.project_gym.repository.idao.ITraineeDAO;
+import com.example.project_gym.repository.idao.ITrainerDAO;
+import com.example.project_gym.utilservices.unauthservices.username.UsernameLookupService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
@@ -15,9 +20,9 @@ import static org.mockito.Mockito.when;
 class UsernameLookupServiceTest {
 
     @Mock
-    private TrainerDaoImpl trainerDao;
+    private ITrainerDAO trainerDao;
     @Mock
-    private TraineeDaoImpl traineeDao;
+    private ITraineeDAO traineeDao;
 
     private UsernameLookupService service;
 
@@ -29,26 +34,25 @@ class UsernameLookupServiceTest {
     }
 
     @Test
-    void existsByUserName_shouldReturnTrueWhenFoundInTrainer() {
-        when(trainerDao.existsByUserName("u")).thenReturn(true);
+    void existsByUserName_shouldReturnTrueWhenTrainerExists() {
+        when(trainerDao.selectByUsername("ivan")).thenReturn(Optional.of(new Trainer()));
 
-        assertTrue(service.existsByUserName("u"));
+        assertTrue(service.existsByUserName("ivan"));
     }
 
     @Test
-    void existsByUserName_shouldReturnTrueWhenFoundInTrainee() {
-        when(trainerDao.existsByUserName("u")).thenReturn(false);
-        when(traineeDao.existsByUserName("u")).thenReturn(true);
+    void existsByUserName_shouldReturnTrueWhenTraineeExists() {
+        when(trainerDao.selectByUsername("hulk")).thenReturn(Optional.empty());
+        when(traineeDao.selectByUsername("hulk")).thenReturn(Optional.of(new Trainee()));
 
-        assertTrue(service.existsByUserName("u"));
+        assertTrue(service.existsByUserName("hulk"));
     }
 
     @Test
-    void existsByUserName_shouldReturnFalseWhenNotFoundAnywhere() {
-        when(trainerDao.existsByUserName("u")).thenReturn(false);
-        when(traineeDao.existsByUserName("u")).thenReturn(false);
+    void existsByUserName_shouldReturnFalseWhenNotFound() {
+        when(trainerDao.selectByUsername("none")).thenReturn(Optional.empty());
+        when(traineeDao.selectByUsername("none")).thenReturn(Optional.empty());
 
-        assertFalse(service.existsByUserName("u"));
+        assertFalse(service.existsByUserName("none"));
     }
 }
-

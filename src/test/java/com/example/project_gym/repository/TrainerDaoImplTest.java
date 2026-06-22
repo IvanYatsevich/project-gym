@@ -1,70 +1,95 @@
 package com.example.project_gym.repository;
 
 import com.example.project_gym.model.Trainer;
-import com.example.project_gym.model.TrainingType;
+import com.example.project_gym.model.Training;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.TypedQuery;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
-import java.util.HashMap;
-import java.util.NoSuchElementException;
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+@ExtendWith(MockitoExtension.class)
 class TrainerDaoImplTest {
 
-    private TrainerDaoImpl dao;
+    @Mock
+    private EntityManager entityManager;
+    @Mock
+    private TypedQuery<Trainer> trainerQuery;
+    @Mock
+    private TypedQuery<Training> trainingQuery;
+
+    private TrainerDaoHibernate dao;
 
     @BeforeEach
     void setUp() {
-        dao = new TrainerDaoImpl();
-        dao.setStorage(new HashMap<>());
+        dao = new TrainerDaoHibernate();
+        ReflectionTestUtils.setField(dao, "entityManager", entityManager);
     }
 
     @Test
-    void createAndSelect_shouldWork() {
+    void create_shouldPersistAndReturnEntity() {
         Trainer trainer = new Trainer();
-        trainer.setId(1L);
-        trainer.setTrainingType(TrainingType.CARDIO);
 
-        dao.create(trainer);
+        Trainer result = dao.create(trainer);
 
-        Trainer actual = dao.selectById(1L).orElseThrow();
-        assertSame(trainer, actual);
+        assertSame(trainer, result);
+        verify(entityManager).persist(trainer);
     }
 
     @Test
-    void update_shouldReplaceExisting() {
+    void selectById_shouldReturnOptional() {
         Trainer trainer = new Trainer();
-        trainer.setId(2L);
-        trainer.setTrainingType(TrainingType.CARDIO);
-        dao.create(trainer);
+        when(entityManager.find(Trainer.class, 1L)).thenReturn(trainer);
 
-        Trainer updated = new Trainer();
-        updated.setId(2L);
-        updated.setTrainingType(TrainingType.STRENGTH);
+        Optional<Trainer> result = dao.selectById(1L);
 
-        dao.update(updated);
-
-        assertEquals(TrainingType.STRENGTH, dao.selectById(2L).orElseThrow().getTrainingType());
+        assertTrue(result.isPresent());
     }
 
     @Test
-    void update_shouldThrowWhenMissing() {
-        Trainer trainer = new Trainer();
-        trainer.setId(99L);
+    void selectByUsername_shouldReturnFound() {
+        when(entityManager.createQuery(anyString(), eq(Trainer.class))).thenReturn(trainerQuery);
+        when(trainerQuery.setParameter("userName", "ivan")).thenReturn(trainerQuery);
+        when(trainerQuery.getResultList()).thenReturn(List.of(new Trainer()));
 
-        assertThrows(NoSuchElementException.class, () -> dao.update(trainer));
+        Optional<Trainer> result = dao.selectByUsername("ivan");
+
+        assertTrue(result.isPresent());
     }
 
     @Test
-    void existsByUserName_shouldIgnoreCase() {
-        Trainer trainer = new Trainer();
-        trainer.setId(3L);
-        trainer.setUserName("John.Smith");
-        dao.create(trainer);
+    void deleteByUsername_shouldReturnFalseWhenMissing() {
+        when(entityManager.createQuery(anyString(), eq(Trainer.class))).thenReturn(trainerQuery);
+        when(trainerQuery.setParameter("userName", "none")).thenReturn(trainerQuery);
+        when(trainerQuery.getResultList()).thenReturn(Collections.emptyList());
 
-        assertTrue(dao.existsByUserName("john.smith"));
-        assertFalse(dao.existsByUserName("other"));
+        assertFalse(dao.deleteByUsername("none"));
+    }
+
+    @Test
+    void getTrainings_shouldReturnResults() {
+        when(entityManager.createQuery(anyString(), eq(Training.class))).thenReturn(trainingQuery);
+        when(trainingQuery.setParameter(eq("trainerUsername"), eq("ivan"))).thenReturn(trainingQuery);
+        Date now = new Date();
+        when(trainingQuery.setParameter("fromDate", now)).thenReturn(trainingQuery);
+        when(trainingQuery.getResultList()).thenReturn(List.of(new Training()));
+
+        List<Training> result = dao.getTrainings("ivan", now, null, null);
+
+        assertEquals(1, result.size());
     }
 }
-

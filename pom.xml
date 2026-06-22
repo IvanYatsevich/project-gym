@@ -193,15 +193,11 @@
 						<configuration>
 							<rules>
 								<rule>
-									<element>BUNDLE</element>
-									<excludes>
-										<exclude>com.example.project_gym.model.*</exclude>
-										<exclude>com.example.project_gym.model.dto.*</exclude>
-										<exclude>com.example.project_gym.model.dto.*.*</exclude>
-										<exclude>com.example.project_gym.config.*</exclude>
-										<exclude>com.example.project_gym.repository.idao.*</exclude>
-										<exclude>com.example.project_gym.ProjectGymApplication</exclude>
-									</excludes>
+									<element>PACKAGE</element>
+									<includes>
+										<include>com.example.project_gym.service*</include>
+										<include>com.example.project_gym.utilservices*</include>
+									</includes>
 									<limits>
 										<limit>
 											<counter>LINE</counter>

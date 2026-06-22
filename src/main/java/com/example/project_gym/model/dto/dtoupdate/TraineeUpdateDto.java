@@ -1,7 +1,11 @@
 package com.example.project_gym.model.dto.dtoupdate;
 
-import com.example.project_gym.model.TrainingType;
+import java.util.Date;
 
 public record TraineeUpdateDto(Boolean isActive,
-                               String address) {
+                               String address,
+                               Date dateOfBirth) {
+    public TraineeUpdateDto(Boolean isActive, String address) {
+        this(isActive, address, null);
+    }
 }

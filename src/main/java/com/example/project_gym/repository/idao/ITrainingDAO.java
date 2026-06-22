@@ -8,5 +8,5 @@ import java.util.Optional;
 public interface ITrainingDAO {
     Training create(Training training);
     Optional<Training> getById(Long id);
-
+    List<Training> getAll();
 }

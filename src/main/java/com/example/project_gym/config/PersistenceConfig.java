@@ -21,7 +21,7 @@ import java.util.Properties;
 @EnableTransactionManagement
 public class PersistenceConfig {
 
-    private final String ENTITIES_PACKAGE = "com.example.project-gym.model";
+    private final String ENTITIES_PACKAGE = "com.example.project_gym.model";
 
     @Value("${db.url}")
     private String dbUrl;

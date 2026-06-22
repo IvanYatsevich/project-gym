@@ -2,109 +2,155 @@ package com.example.project_gym.view;
 
 import com.example.project_gym.model.Trainee;
 import com.example.project_gym.model.Trainer;
-import com.example.project_gym.model.Training;
-import com.example.project_gym.model.TrainingType;
+import com.example.project_gym.model.UserType;
+import com.example.project_gym.model.User;
+import com.example.project_gym.model.dto.dtoin.LoginResultDto;
+import com.example.project_gym.service.AuthorizationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.verify;
+import javax.naming.AuthenticationException;
+import java.util.Date;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ConsoleCommandHandlerTest {
 
     @Mock
-    private GymFacade gymFacade;
+    private GuestConsoleCommandService guestConsoleCommandService;
+
+    @Mock
+    private AuthorizedProfileConsoleCommandService authorizedProfileConsoleCommandService;
+
+    @Mock
+    private AuthorizationService authorizationService;
 
     private ConsoleCommandHandler handler;
 
     @BeforeEach
     void setUp() {
-        handler = new ConsoleCommandHandler(gymFacade);
+        handler = new ConsoleCommandHandler(
+                guestConsoleCommandService,
+                authorizedProfileConsoleCommandService,
+                authorizationService
+        );
     }
 
     @Test
     void handle_shouldReturnHelp() {
+        when(guestConsoleCommandService.isHelpCommand("help")).thenReturn(true);
+        when(guestConsoleCommandService.showHelp()).thenReturn("Commands:");
+
         String output = handler.handle("help");
 
         assertTrue(output.contains("Commands:"));
-        assertTrue(output.contains("trainer create"));
+        assertTrue(output.contains("authorize <username> <password>"));
     }
 
     @Test
     void handle_shouldReturnExit() {
+        when(guestConsoleCommandService.isExitCommand("exit")).thenReturn(true);
+
         assertEquals("exit", handler.handle("exit"));
     }
 
     @Test
-    void handle_shouldCreateTrainer() {
+    void handle_shouldReturnAuthorizeUsageForBareAuthorize() {
+        when(guestConsoleCommandService.isHelpCommand("authorize")).thenReturn(false);
+        when(guestConsoleCommandService.isAuthorizeCommand("authorize")).thenReturn(true);
+
+        String output = handler.handle("authorize");
+
+        assertEquals("Use: authorize <username> <password>", output);
+    }
+
+    @Test
+    void handle_shouldAuthorizeAndSwitchToAuthorizedMode() throws AuthenticationException {
+        when(guestConsoleCommandService.isHelpCommand("authorize john 123")).thenReturn(false);
+        when(guestConsoleCommandService.isAuthorizeCommand("authorize john 123")).thenReturn(false);
+        when(authorizationService.authenticate(new LoginResultDto("john", "123"))).thenReturn(UserType.TRAINEE);
+
+        String output = handler.handle("authorize john 123");
+
+        assertTrue(output.contains("Authorized as TRAINEE: john"));
+    }
+
+    @Test
+    void handle_shouldProcessGuestTrainerCreate() {
         Trainer trainer = new Trainer();
-        trainer.setId(1L);
-        when(gymFacade.createTrainer("Ivan", "Ivanov", TrainingType.CARDIO)).thenReturn(trainer);
+        User user = new User();
+        user.setUserName("Ivan.Ivanov");
+        user.setPassword("secret");
+        trainer.setUser(user);
+
+        when(guestConsoleCommandService.isHelpCommand("trainer create ivan ivanov cardio")).thenReturn(false);
+        when(guestConsoleCommandService.isAuthorizeCommand("trainer create ivan ivanov cardio")).thenReturn(false);
+        when(guestConsoleCommandService.isTrainerCreateCommand("trainer create ivan ivanov cardio")).thenReturn(true);
+        when(guestConsoleCommandService.createTrainer("trainer create Ivan Ivanov CARDIO")).thenReturn(trainer);
 
         String output = handler.handle("trainer create Ivan Ivanov CARDIO");
 
-        assertTrue(output.startsWith("Created trainer:"));
-        verify(gymFacade).createTrainer("Ivan", "Ivanov", TrainingType.CARDIO);
+        assertTrue(output.startsWith("Trainer created:"));
     }
 
     @Test
-    void handle_shouldUpdateTrainerWithNullableFields() {
-        when(gymFacade.updateTrainer(2L, null, null)).thenReturn(new Trainer());
+    void handle_shouldProcessGuestTraineeCreate() {
+        Trainee trainee = new Trainee();
+        User user = new User();
+        user.setUserName("Ann.Lee");
+        user.setPassword("secret");
+        trainee.setUser(user);
 
-        String output = handler.handle("trainer update 2 null null");
-
-        assertTrue(output.startsWith("Updated trainer:"));
-        verify(gymFacade).updateTrainer(2L, null, null);
-    }
-
-    @Test
-    void handle_shouldCreateTraineeWithAddressContainingSpaces() {
-        when(gymFacade.createTrainee(eq("Ann"), eq("Lee"), any(), eq("New York"))).thenReturn(new Trainee());
+        when(guestConsoleCommandService.isHelpCommand("trainee create ann lee 2025-01-20 new york")).thenReturn(false);
+        when(guestConsoleCommandService.isAuthorizeCommand("trainee create ann lee 2025-01-20 new york")).thenReturn(false);
+        when(guestConsoleCommandService.isTrainerCreateCommand("trainee create ann lee 2025-01-20 new york")).thenReturn(false);
+        when(guestConsoleCommandService.isTraineeCreateCommand("trainee create ann lee 2025-01-20 new york")).thenReturn(true);
+        when(guestConsoleCommandService.createTrainee("trainee create Ann Lee 2025-01-20 New York")).thenReturn(trainee);
 
         String output = handler.handle("trainee create Ann Lee 2025-01-20 New York");
 
-        assertTrue(output.startsWith("Created trainee:"));
-        verify(gymFacade).createTrainee(eq("Ann"), eq("Lee"), any(), eq("New York"));
+        assertTrue(output.startsWith("Trainee created:"));
     }
 
     @Test
-    void handle_shouldUpdateTraineeWithNullAddressByDash() {
-        when(gymFacade.updateTrainee(3L, true, null)).thenReturn(new Trainee());
+    void handle_shouldHandleAuthorizedHelpAfterLogin() throws AuthenticationException {
+        when(guestConsoleCommandService.isHelpCommand("authorize john 123")).thenReturn(false);
+        when(guestConsoleCommandService.isAuthorizeCommand("authorize john 123")).thenReturn(false);
+        when(authorizationService.authenticate(new LoginResultDto("john", "123"))).thenReturn(UserType.TRAINER);
 
-        String output = handler.handle("trainee update 3 true -");
+        handler.handle("authorize john 123");
+        String output = handler.handle("help");
 
-        assertTrue(output.startsWith("Updated trainee:"));
-        verify(gymFacade).updateTrainee(3L, true, null);
+        assertTrue(output.contains("Authorized commands:"));
+        assertTrue(output.contains("logout"));
     }
 
     @Test
-    void handle_shouldDeleteTrainee() {
-        when(gymFacade.deleteTrainee(4L)).thenReturn(true);
+    void handle_shouldLogoutFromAuthorizedMode() throws AuthenticationException {
+        when(guestConsoleCommandService.isHelpCommand("authorize john 123")).thenReturn(false);
+        when(guestConsoleCommandService.isAuthorizeCommand("authorize john 123")).thenReturn(false);
+        when(authorizationService.authenticate(new LoginResultDto("john", "123"))).thenReturn(UserType.TRAINEE);
 
-        String output = handler.handle("trainee delete 4");
+        handler.handle("authorize john 123");
+        String output = handler.handle("logout");
 
-        assertEquals("Trainee deleted.", output);
-        verify(gymFacade).deleteTrainee(4L);
-    }
-
-    @Test
-    void handle_shouldCreateTraining() {
-        when(gymFacade.createTraining(eq(1L), eq(2L), eq("Morning"), eq(TrainingType.CARDIO), any(), any()))
-                .thenReturn(new Training());
-
-        String output = handler.handle("training create 1 2 Morning CARDIO 2025-02-10 45");
-
-        assertTrue(output.startsWith("Created training:"));
+        assertEquals("Logged out from TRAINEE profile.", output);
     }
 
     @Test
     void handle_shouldReturnErrorOnNotEnoughArgs() {
+        when(guestConsoleCommandService.isHelpCommand("trainer create ivan")).thenReturn(false);
+        when(guestConsoleCommandService.isAuthorizeCommand("trainer create ivan")).thenReturn(false);
+        when(guestConsoleCommandService.isTrainerCreateCommand("trainer create ivan")).thenReturn(true);
+        when(guestConsoleCommandService.createTrainer("trainer create Ivan"))
+                .thenThrow(new IllegalArgumentException("trainer create requires firstName, lastName and trainingTypeName."));
+
         String output = handler.handle("trainer create Ivan");
 
         assertTrue(output.startsWith("Error:"));
@@ -112,6 +158,11 @@ class ConsoleCommandHandlerTest {
 
     @Test
     void handle_shouldReturnUnknownCommand() {
+        when(guestConsoleCommandService.isHelpCommand("something else")).thenReturn(false);
+        when(guestConsoleCommandService.isAuthorizeCommand("something else")).thenReturn(false);
+        when(guestConsoleCommandService.isTrainerCreateCommand("something else")).thenReturn(false);
+        when(guestConsoleCommandService.isTraineeCreateCommand("something else")).thenReturn(false);
+
         assertEquals("Unknown command. Type 'help'.", handler.handle("something else"));
     }
 }

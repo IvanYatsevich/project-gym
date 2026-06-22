@@ -1,187 +1,243 @@
 package com.example.project_gym.view;
 
-import com.example.project_gym.model.TrainingType;
+
+import com.example.project_gym.model.Trainee;
+import com.example.project_gym.model.Trainer;
+import com.example.project_gym.model.UserType;
+import com.example.project_gym.model.dto.dtoin.LoginResultDto;
+import com.example.project_gym.service.AuthorizationService;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Component;
 
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.time.Duration;
-import java.util.Arrays;
-import java.util.Date;
+import javax.naming.AuthenticationException;
+import java.util.Locale;
+
 
 @Component
 public class ConsoleCommandHandler {
 
-    private static final String HELP = """
-            Commands:
-              help
-              exit
-              trainer create <firstName> <lastName> <CARDIO|STRENGTH>
-              trainer update <id> <true|false|null> <CARDIO|STRENGTH|null>
-              trainer get <id>
-              trainee create <firstName> <lastName> <yyyy-MM-dd> <address>
-              trainee update <id> <true|false|null> <address|->
-              trainee delete <id>
-              trainee get <id>
-              training create <trainerId> <traineeId> <trainingName> <CARDIO|STRENGTH> <yyyy-MM-dd> <durationMinutes>
-              training get <id>
-            """;
+    private final GuestConsoleCommandService guestConsoleCommandService;
+    private final AuthorizedProfileConsoleCommandService authorizedProfileConsoleCommandService;
+    private final AuthorizationService authorizationService;
+    private UserType currentUserType = UserType.UNKNOWN;
+    private String authorizedUsername;
 
-    private final GymFacade gymFacade;
-    private final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
-
-    public ConsoleCommandHandler(GymFacade gymFacade) {
-        this.gymFacade = gymFacade;
+    public ConsoleCommandHandler(GuestConsoleCommandService guestConsoleCommandService,
+                                 AuthorizedProfileConsoleCommandService authorizedProfileConsoleCommandService,
+                                 AuthorizationService authorizationService) {
+        this.guestConsoleCommandService = guestConsoleCommandService;
+        this.authorizedProfileConsoleCommandService = authorizedProfileConsoleCommandService;
+        this.authorizationService = authorizationService;
     }
 
     public String handle(String input) {
-        String line = input == null ? "" : input.trim();
-        if (line.isEmpty()) {
+        if (input == null || input.isBlank()) {
             return "";
         }
 
-        String[] tokens = line.split("\\s+");
+        String trimmedInput = input.trim();
+        String command = trimmedInput.toLowerCase(Locale.ROOT);
+
+        if (guestConsoleCommandService.isExitCommand(command)
+                || authorizedProfileConsoleCommandService.isExitCommand(command)) {
+            return "exit";
+        }
+
+        if (isAuthorized()) {
+            return handleAuthorizedCommand(trimmedInput, command);
+        }
+
+        return handleGuestCommand(trimmedInput, command);
+    }
+
+    private String handleGuestCommand(String trimmedInput, String command) {
+        String commandKey = resolveGuestCommandKey(command);
 
         try {
-            if ("help".equalsIgnoreCase(tokens[0])) {
-                return HELP;
-            }
-            if ("exit".equalsIgnoreCase(tokens[0])) {
-                return "exit";
-            }
-
-            if ("trainer".equalsIgnoreCase(tokens[0])) {
-                return handleTrainer(tokens);
-            }
-            if ("trainee".equalsIgnoreCase(tokens[0])) {
-                return handleTrainee(tokens);
-            }
-            if ("training".equalsIgnoreCase(tokens[0])) {
-                return handleTraining(tokens);
-            }
-
-            return "Unknown command. Type 'help'.";
-        } catch (Exception e) {
+            return switch (commandKey) {
+                case "help" -> guestConsoleCommandService.showHelp() + "\nauthorize <username> <password> - Login with credentials";
+                case "authorize-usage" -> "Use: authorize <username> <password>";
+                case "authorize" -> authorize(trimmedInput);
+                case "trainer-create" -> {
+                    Trainer trainer = guestConsoleCommandService.createTrainer(trimmedInput);
+                    yield "Trainer created: " + trainer.getUser().getUserName() +
+                            " password: " + trainer.getUser().getPassword();
+                }
+                case "trainee-create" -> {
+                    Trainee trainee = guestConsoleCommandService.createTrainee(trimmedInput);
+                    yield "Trainee created: " + trainee.getUser().getUserName() +
+                            " password: " + trainee.getUser().getPassword();
+                }
+                default -> "Unknown command. Type 'help'.";
+            };
+        } catch (IllegalArgumentException | IllegalStateException | EntityNotFoundException e) {
             return "Error: " + e.getMessage();
         }
     }
 
-    private String handleTrainer(String[] tokens) {
-        requireMin(tokens, 3);
-
-        if ("create".equalsIgnoreCase(tokens[1])) {
-            requireMin(tokens, 5);
-            var trainer = gymFacade.createTrainer(
-                    tokens[2],
-                    tokens[3],
-                    TrainingType.valueOf(tokens[4].toUpperCase())
-            );
-            return "Created trainer: " + trainer;
+    private String handleAuthorizedCommand(String trimmedInput, String command) {
+        String commandKey = resolveAuthorizedCommandKey(command);
+        try {
+            return switch (commandKey) {
+                case "help" -> showAuthorizedHelp();
+                case "logout" -> logout();
+                case "trainer-select" -> "Selected trainer: " + authorizedProfileConsoleCommandService.selectTrainer(trimmedInput).getUser().getUserName();
+                case "trainee-select" -> "Selected trainee: " + authorizedProfileConsoleCommandService.selectTrainee(trimmedInput).getUser().getUserName();
+                case "trainee-password-change" -> {
+                    authorizedProfileConsoleCommandService.changeTraineePassword(trimmedInput);
+                    yield "Trainee password changed.";
+                }
+                case "trainer-password-change" -> {
+                    authorizedProfileConsoleCommandService.changeTrainerPassword(trimmedInput);
+                    yield "Trainer password changed.";
+                }
+                case "trainer-update" -> "Updated trainer: " + authorizedProfileConsoleCommandService.updateTrainer(trimmedInput).getId();
+                case "trainee-update" -> "Updated trainee: " + authorizedProfileConsoleCommandService.updateTrainee(trimmedInput).getId();
+                case "trainee-activate" -> "Activated trainee: " + authorizedProfileConsoleCommandService.activateTrainee(trimmedInput).getUser().getUserName();
+                case "trainee-deactivate" -> "Deactivated trainee: " + authorizedProfileConsoleCommandService.deactivateTrainee(trimmedInput).getUser().getUserName();
+                case "trainer-activate" -> "Activated trainer: " + authorizedProfileConsoleCommandService.activateTrainer(trimmedInput).getUser().getUserName();
+                case "trainer-deactivate" -> "Deactivated trainer: " + authorizedProfileConsoleCommandService.deactivateTrainer(trimmedInput).getUser().getUserName();
+                case "trainee-delete" -> authorizedProfileConsoleCommandService.deleteTrainee(trimmedInput)
+                        ? "Trainee deleted."
+                        : "Trainee not found.";
+                case "trainee-trainings" -> "Trainee trainings: " + authorizedProfileConsoleCommandService.getTraineeTrainings(trimmedInput).size();
+                case "trainer-trainings" -> "Trainer trainings: " + authorizedProfileConsoleCommandService.getTrainerTrainings(trimmedInput).size();
+                case "training-add" -> "Created training: " + authorizedProfileConsoleCommandService.addTraining(trimmedInput).getId();
+                case "trainee-unassigned-trainers" -> "Unassigned trainers: " + authorizedProfileConsoleCommandService.getUnassignedTrainers(trimmedInput).size();
+                case "trainee-trainers-update" -> {
+                    authorizedProfileConsoleCommandService.updateTraineesTrainers(trimmedInput);
+                    yield "Trainee trainers list updated.";
+                }
+                default -> "Unknown authorized command. Type 'help'.";
+            };
+        } catch (IllegalArgumentException | IllegalStateException | EntityNotFoundException ex) {
+            return "Error: " + ex.getMessage();
         }
-
-        if ("update".equalsIgnoreCase(tokens[1])) {
-            requireMin(tokens, 5);
-            Long id = Long.parseLong(tokens[2]);
-            Boolean isActive = parseNullableBoolean(tokens[3]);
-            TrainingType specialization = parseNullableTrainingType(tokens[4]);
-            var trainer = gymFacade.updateTrainer(id, isActive, specialization);
-            return "Updated trainer: " + trainer;
-        }
-
-        if ("get".equalsIgnoreCase(tokens[1])) {
-            var trainer = gymFacade.getTrainer(Long.parseLong(tokens[2]));
-            return "Trainer: " + trainer;
-        }
-
-        return "Unknown trainer action. Type 'help'.";
     }
 
-    private String handleTrainee(String[] tokens) throws ParseException {
-        requireMin(tokens, 3);
-
-        if ("create".equalsIgnoreCase(tokens[1])) {
-            requireMin(tokens, 6);
-            Date date = dateFormat.parse(tokens[4]);
-            String address = String.join(" ", Arrays.copyOfRange(tokens, 5, tokens.length));
-            var trainee = gymFacade.createTrainee(tokens[2], tokens[3], date, address);
-            return "Created trainee: " + trainee;
+    private String resolveGuestCommandKey(String command) {
+        if (guestConsoleCommandService.isHelpCommand(command)) {
+            return "help";
         }
-
-        if ("update".equalsIgnoreCase(tokens[1])) {
-            requireMin(tokens, 5);
-            Long id = Long.parseLong(tokens[2]);
-            Boolean isActive = parseNullableBoolean(tokens[3]);
-            String address = String.join(" ", Arrays.copyOfRange(tokens, 4, tokens.length));
-            if ("-".equals(address)) {
-                address = null;
-            }
-            var trainee = gymFacade.updateTrainee(id, isActive, address);
-            return "Updated trainee: " + trainee;
+        if (guestConsoleCommandService.isAuthorizeCommand(command)) {
+            return "authorize-usage";
         }
-
-        if ("delete".equalsIgnoreCase(tokens[1])) {
-            requireMin(tokens, 3);
-            boolean deleted = gymFacade.deleteTrainee(Long.parseLong(tokens[2]));
-            return deleted ? "Trainee deleted." : "Trainee was not deleted.";
+        if (command.startsWith("authorize ")) {
+            return "authorize";
         }
-
-        if ("get".equalsIgnoreCase(tokens[1])) {
-            var trainee = gymFacade.getTrainee(Long.parseLong(tokens[2]));
-            return "Trainee: " + trainee;
+        if (guestConsoleCommandService.isTrainerCreateCommand(command)) {
+            return "trainer-create";
         }
-
-        return "Unknown trainee action. Type 'help'.";
+        if (guestConsoleCommandService.isTraineeCreateCommand(command)) {
+            return "trainee-create";
+        }
+        return "unknown";
     }
 
-    private String handleTraining(String[] tokens) throws ParseException {
-        requireMin(tokens, 3);
-
-        if ("create".equalsIgnoreCase(tokens[1])) {
-            requireMin(tokens, 8);
-
-            Long trainerId = Long.parseLong(tokens[2]);
-            Long traineeId = Long.parseLong(tokens[3]);
-            String trainingName = tokens[4];
-            TrainingType trainingType = TrainingType.valueOf(tokens[5].toUpperCase());
-            Date trainingDate = dateFormat.parse(tokens[6]);
-            Duration duration = Duration.ofMinutes(Long.parseLong(tokens[7]));
-
-            var training = gymFacade.createTraining(
-                    trainerId,
-                    traineeId,
-                    trainingName,
-                    trainingType,
-                    trainingDate,
-                    duration
-            );
-            return "Created training: " + training;
+    private String resolveAuthorizedCommandKey(String command) {
+        if ("help".equals(command)) {
+            return "help";
         }
-
-        if ("get".equalsIgnoreCase(tokens[1])) {
-            var training = gymFacade.getTraining(Long.parseLong(tokens[2]));
-            return "Training: " + training;
+        if ("logout".equals(command)) {
+            return "logout";
         }
-
-        return "Unknown training action. Type 'help'.";
+        if (authorizedProfileConsoleCommandService.isSelectTrainerCommand(command)) {
+            return "trainer-select";
+        }
+        if (authorizedProfileConsoleCommandService.isSelectTraineeCommand(command)) {
+            return "trainee-select";
+        }
+        if (authorizedProfileConsoleCommandService.isTraineePasswordChangeCommand(command)) {
+            return "trainee-password-change";
+        }
+        if (authorizedProfileConsoleCommandService.isTrainerPasswordChangeCommand(command)) {
+            return "trainer-password-change";
+        }
+        if (authorizedProfileConsoleCommandService.isUpdateTrainerCommand(command)) {
+            return "trainer-update";
+        }
+        if (authorizedProfileConsoleCommandService.isUpdateTraineeCommand(command)) {
+            return "trainee-update";
+        }
+        if (authorizedProfileConsoleCommandService.isActivateTraineeCommand(command)) {
+            return "trainee-activate";
+        }
+        if (authorizedProfileConsoleCommandService.isDeactivateTraineeCommand(command)) {
+            return "trainee-deactivate";
+        }
+        if (authorizedProfileConsoleCommandService.isActivateTrainerCommand(command)) {
+            return "trainer-activate";
+        }
+        if (authorizedProfileConsoleCommandService.isDeactivateTrainerCommand(command)) {
+            return "trainer-deactivate";
+        }
+        if (authorizedProfileConsoleCommandService.isDeleteTraineeCommand(command)) {
+            return "trainee-delete";
+        }
+        if (authorizedProfileConsoleCommandService.isGetTraineeTrainingsCommand(command)) {
+            return "trainee-trainings";
+        }
+        if (authorizedProfileConsoleCommandService.isGetTrainerTrainingsCommand(command)) {
+            return "trainer-trainings";
+        }
+        if (authorizedProfileConsoleCommandService.isAddTrainingCommand(command)) {
+            return "training-add";
+        }
+        if (authorizedProfileConsoleCommandService.isGetUnassignedTrainersCommand(command)) {
+            return "trainee-unassigned-trainers";
+        }
+        if (authorizedProfileConsoleCommandService.isUpdateTraineesTrainersCommand(command)) {
+            return "trainee-trainers-update";
+        }
+        return "unknown";
     }
 
-    private TrainingType parseNullableTrainingType(String token) {
-        if ("null".equalsIgnoreCase(token)) {
-            return null;
-        }
-        return TrainingType.valueOf(token.toUpperCase());
+    private String logout() {
+        UserType previousType = currentUserType;
+        authorizedUsername = null;
+        currentUserType = UserType.UNKNOWN;
+        return "Logged out from " + previousType + " profile.";
     }
 
-    private Boolean parseNullableBoolean(String token) {
-        if ("null".equalsIgnoreCase(token)) {
-            return null;
+    private String authorize(String trimmedInput) {
+        String[] parts = trimmedInput.split("\\s+");
+        if (parts.length != 3) {
+            return "Error: authorize <username> <password>";
         }
-        return Boolean.parseBoolean(token);
+
+        try {
+            LoginResultDto loginResultDto = new LoginResultDto(parts[1], parts[2]);
+            currentUserType = authorizationService.authenticate(loginResultDto);
+            authorizedUsername = parts[1];
+            return "Authorized as " + currentUserType + ": " + authorizedUsername + ". Type 'help' for available commands.";
+        } catch (AuthenticationException e) {
+            return "Error: " + e.getMessage();
+        }
     }
 
-    private void requireMin(String[] tokens, int expectedMin) {
-        if (tokens.length < expectedMin) {
-            throw new IllegalArgumentException("Not enough arguments. Type 'help'.");
-        }
+    private boolean isAuthorized() {
+        return currentUserType == UserType.TRAINER || currentUserType == UserType.TRAINEE;
+    }
+
+    private String showAuthorizedHelp() {
+        return """
+                Authorized commands:
+                trainer select <username>
+                trainee select <username>
+                trainee password-change <username> <oldPassword> <newPassword>
+                trainer password-change <username> <oldPassword> <newPassword>
+                trainer update <username> [specialization=<type>] [active=true|false]
+                trainee update <username> [address=<value>] [active=true|false] [dateOfBirth=dd-MM-yyy]
+                trainee activate <username> | trainee deactivate <username>
+                trainer activate <username> | trainer deactivate <username>
+                trainee delete <username>
+                trainee trainings <username> [fromDate=dd-MM-yyy] [toDate=dd-MM-yyy] [trainerName=<name>] [trainingType=<type>]
+                trainer trainings <username> [fromDate=dd-MM-yyy] [toDate=dd-MM-yyy] [traineeName=<name>]
+                training add <traineeUsername> <trainerUsername> <trainingTypeName> <trainingName> <dd-MM-yyy> <durationMinutes>
+                trainee unassigned-trainers <username>
+                trainee trainers-update <username> <trainerUsername1,trainerUsername2,...>
+                logout
+                exit
+                """;
     }
 }

@@ -1,4 +1,4 @@
-package com.example.project_gym.utilservices;
+package com.example.project_gym.utilservices.unauthservices.username;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;

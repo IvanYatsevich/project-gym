@@ -28,6 +28,7 @@ public class ConsoleAppRunner {
         log.info("Type 'help' to see commands. Type 'exit' to finish");
         try (Scanner scanner = new Scanner(System.in)) {
             while (true) {
+                System.out.print("> ");
                 String input = scanner.nextLine();
                 String output = commandHandler.handle(input);
 
@@ -42,4 +43,3 @@ public class ConsoleAppRunner {
         }
     }
 }
-

@@ -1,34 +1,40 @@
 package com.example.project_gym.service;
 
 import com.example.project_gym.model.Trainee;
+import com.example.project_gym.model.Trainer;
+import com.example.project_gym.model.Training;
+import com.example.project_gym.model.User;
 import com.example.project_gym.model.dto.dtoin.TraineeDtoIn;
+import com.example.project_gym.model.dto.dtoin.TrainingFilterDto;
 import com.example.project_gym.model.dto.dtoupdate.TraineeUpdateDto;
-import com.example.project_gym.repository.TraineeDaoImpl;
-import com.example.project_gym.utilservices.PasswordGenerator;
-import com.example.project_gym.utilservices.UniqueUserNameGenerator;
-import com.example.project_gym.utilservices.UserIdGenerator;
+import com.example.project_gym.repository.idao.ITraineeDAO;
+import com.example.project_gym.utilservices.authservices.PasswordChangeService;
+import com.example.project_gym.utilservices.unauthservices.password.PasswordGenerator;
+import com.example.project_gym.utilservices.unauthservices.username.UniqueUserNameGenerator;
+import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Date;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class TraineeServiceTest {
 
     @Mock
-    private TraineeDaoImpl traineeDao;
+    private ITraineeDAO traineeDao;
     @Mock
-    private UserIdGenerator idGenerator;
+    private PasswordChangeService passwordChangeService;
     @Mock
     private UniqueUserNameGenerator userNameGenerator;
     @Mock
@@ -40,87 +46,126 @@ class TraineeServiceTest {
     void setUp() {
         traineeService = new TraineeService();
         ReflectionTestUtils.setField(traineeService, "traineeDao", traineeDao);
-        traineeService.setIdGenerator(idGenerator);
+        ReflectionTestUtils.setField(traineeService, "passwordChangeService", passwordChangeService);
         traineeService.setUserNameGenerator(userNameGenerator);
         traineeService.setPasswordGenerator(passwordGenerator);
     }
 
     @Test
-    void create_shouldFillAndPersistTrainee() {
+    void create_shouldCreateTrainee() {
         Date dob = new Date();
-        TraineeDtoIn dto = new TraineeDtoIn("Ivan", "Ivanov", dob, "Minsk");
+        when(userNameGenerator.generateUnique("Hulk", "Hogan")).thenReturn("Hulk.Hogan");
+        when(passwordGenerator.generatePassword()).thenReturn("Pass12345");
 
-        when(idGenerator.generateId()).thenReturn(10L);
-        when(userNameGenerator.generateUnique("Ivan", "Ivanov")).thenReturn("Ivan.Ivanov");
-        when(passwordGenerator.generatePassword()).thenReturn("pass123");
-        when(traineeDao.create(any(Trainee.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        Trainee trainee = traineeService.create(new TraineeDtoIn("Hulk", "Hogan", dob, "NY"));
 
-        Trainee result = traineeService.create(dto);
-
-        assertEquals(10L, result.getId());
-        assertEquals(10L, result.getUserId());
-        assertEquals("Ivan", result.getFirstName());
-        assertEquals("Ivanov", result.getLastName());
-        assertEquals("Ivan.Ivanov", result.getUserName());
-        assertEquals("pass123", result.getPassword());
-        assertTrue(result.isActive());
-        assertEquals("Minsk", result.getAddress());
-        assertEquals(dob, result.getDateOfBirth());
-
-        ArgumentCaptor<Trainee> captor = ArgumentCaptor.forClass(Trainee.class);
-        verify(traineeDao).create(captor.capture());
-        assertEquals(10L, captor.getValue().getId());
+        assertEquals("Hulk", trainee.getUser().getFirstName());
+        assertEquals("Hulk.Hogan", trainee.getUser().getUserName());
+        assertEquals("NY", trainee.getAddress());
+        assertEquals(dob, trainee.getDateOfBirth());
+        verify(traineeDao).create(any(Trainee.class));
     }
 
     @Test
-    void select_shouldReturnTraineeWhenExists() {
+    void create_shouldThrowWhenFirstNameBlank() {
+        assertThrows(IllegalArgumentException.class,
+                () -> traineeService.create(new TraineeDtoIn(" ", "Hogan", null, null)));
+    }
+
+    @Test
+    void selectByUsername_shouldThrowWhenMissing() {
+        when(traineeDao.selectByUsername("missing")).thenReturn(Optional.empty());
+        assertThrows(EntityNotFoundException.class, () -> traineeService.selectByUsername("missing"));
+    }
+
+    @Test
+    void update_shouldChangeAddressAndStatus() {
         Trainee trainee = new Trainee();
-        trainee.setId(5L);
-        when(traineeDao.selectById(5L)).thenReturn(Optional.of(trainee));
+        User user = new User();
+        user.setActive(false);
+        trainee.setUser(user);
+        when(traineeDao.selectById(1L)).thenReturn(Optional.of(trainee));
 
-        Trainee result = traineeService.select(5L);
+        Trainee updated = traineeService.update(1L, new TraineeUpdateDto(true, "LA"));
 
-        assertSame(trainee, result);
+        assertTrue(updated.getUser().isActive());
+        assertEquals("LA", updated.getAddress());
+        verify(traineeDao).update(trainee);
     }
 
     @Test
-    void select_shouldThrowWhenMissing() {
-        when(traineeDao.selectById(99L)).thenReturn(Optional.empty());
-
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> traineeService.select(99L));
-
-        assertTrue(ex.getMessage().contains("99"));
+    void update_shouldThrowWhenDtoMissing() {
+        assertThrows(IllegalArgumentException.class, () -> traineeService.update(1L, null));
     }
 
     @Test
-    void update_shouldApplyProvidedFieldsOnly() {
-        Trainee existing = new Trainee();
-        existing.setId(8L);
-        existing.setActive(false);
-        existing.setAddress("Old");
+    void getTrainings_shouldDelegateToDao() {
+        Date now = new Date();
+        List<Training> trainings = List.of(new Training());
+        when(traineeDao.getTrainings("hulk", now, now, "ivan", "CARDIO")).thenReturn(trainings);
 
-        when(traineeDao.selectById(8L)).thenReturn(Optional.of(existing));
-        when(traineeDao.update(any(Trainee.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        List<Training> result = traineeService.getTrainings(new TrainingFilterDto("hulk", now, now, "ivan", "CARDIO"));
 
-        Trainee updated = traineeService.update(8L, new TraineeUpdateDto(true, "New"));
-
-        assertTrue(updated.isActive());
-        assertEquals("New", updated.getAddress());
-        verify(traineeDao).update(existing);
+        assertEquals(1, result.size());
     }
 
     @Test
-    void delete_shouldDeleteByExistingId() {
-        Trainee existing = new Trainee();
-        existing.setId(3L);
+    void getUnassignedTrainers_shouldDelegateToDao() {
+        when(traineeDao.findUnassignedTrainers("hulk")).thenReturn(List.of(new Trainer()));
 
-        when(traineeDao.selectById(3L)).thenReturn(Optional.of(existing));
-        when(traineeDao.delete(3L)).thenReturn(true);
+        List<Trainer> result = traineeService.getUnassignedTrainers("hulk");
 
-        boolean result = traineeService.delete(3L);
+        assertEquals(1, result.size());
+    }
 
-        assertTrue(result);
-        verify(traineeDao).delete(3L);
+    @Test
+    void authenticate_shouldReturnTrueForCorrectPassword() {
+        Trainee trainee = new Trainee();
+        User user = new User();
+        user.setPassword("secret");
+        trainee.setUser(user);
+        when(traineeDao.selectByUsername("hulk")).thenReturn(Optional.of(trainee));
+
+        assertTrue(traineeService.authenticate("hulk", "secret"));
+    }
+
+    @Test
+    void authenticate_shouldThrowWhenMissing() {
+        when(traineeDao.selectByUsername("none")).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class, () -> traineeService.authenticate("none", "123"));
+    }
+
+    @Test
+    void toggleActive_shouldFlipStatus() {
+        Trainee trainee = new Trainee();
+        User user = new User();
+        user.setActive(true);
+        trainee.setUser(user);
+        when(traineeDao.selectByUsername("hulk")).thenReturn(Optional.of(trainee));
+
+        Trainee result = traineeService.toggleActive("hulk");
+
+        assertFalse(result.getUser().isActive());
+        verify(traineeDao).update(trainee);
+    }
+
+    @Test
+    void updateTrainersList_shouldDelegate() {
+        Trainee trainee = new Trainee();
+        trainee.setUser(new User());
+        when(traineeDao.selectByUsername("hulk")).thenReturn(Optional.of(trainee));
+        List<Trainer> trainers = List.of(new Trainer());
+
+        traineeService.updateTrainersList("hulk", trainers);
+
+        verify(traineeDao).updateTrainersList(trainee, trainers);
+    }
+
+    @Test
+    void deleteByUsername_shouldDelegate() {
+        when(traineeDao.deleteByUsername("hulk")).thenReturn(true);
+
+        assertTrue(traineeService.deleteByUsername("hulk"));
     }
 }
-

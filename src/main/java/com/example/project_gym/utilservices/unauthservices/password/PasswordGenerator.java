@@ -1,4 +1,4 @@
-package com.example.project_gym.utilservices;
+package com.example.project_gym.utilservices.unauthservices.password;
 
 import org.springframework.stereotype.Service;
 

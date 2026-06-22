@@ -1,5 +1,6 @@
 package com.example.project_gym.utilservices;
 
+import com.example.project_gym.utilservices.unauthservices.username.RawUserNameGenerator;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;

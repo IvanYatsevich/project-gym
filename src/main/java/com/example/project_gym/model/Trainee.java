@@ -5,6 +5,7 @@ import lombok.*;
 
 import java.util.Date;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 @Data
@@ -25,11 +26,14 @@ public class Trainee {
     @Column
     private String address;
 
-    @OneToOne
+    @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "user_id")
     private User user;
 
     @ManyToMany(mappedBy = "trainees")
     private Set<Trainer> trainers = new HashSet<>();
+
+    @OneToMany(mappedBy = "trainee", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    private List<Training> trainings;
 }
 
