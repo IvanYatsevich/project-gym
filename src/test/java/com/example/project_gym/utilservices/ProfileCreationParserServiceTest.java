@@ -1,8 +1,8 @@
 package com.example.project_gym.utilservices;
 
-import com.example.project_gym.model.dto.dtoin.TraineeDtoIn;
-import com.example.project_gym.model.dto.dtoin.TrainerDtoIn;
-import com.example.project_gym.utilservices.unauthservices.ProfileCreationParserService;
+import com.example.project_gym.model.request.CreateTraineeRequest;
+import com.example.project_gym.model.request.CreateTrainerRequest;
+import com.example.project_gym.utilservices.guestservices.ProfileCreationParserService;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -13,7 +13,7 @@ class ProfileCreationParserServiceTest {
 
     @Test
     void parseTrainerCreate_shouldParseValues() {
-        TrainerDtoIn dto = parser.parseTrainerCreate("trainer create Ivan Ivanov CARDIO");
+        CreateTrainerRequest dto = parser.parseTrainerCreate("trainer create Ivan Ivanov CARDIO");
 
         assertEquals("Ivan", dto.firstName());
         assertEquals("Ivanov", dto.lastName());
@@ -22,7 +22,7 @@ class ProfileCreationParserServiceTest {
 
     @Test
     void parseTraineeCreate_shouldParseDateAndAddress() {
-        TraineeDtoIn dto = parser.parseTraineeCreate("trainee create Hulk Hogan 21-04-1995 New York");
+        CreateTraineeRequest dto = parser.parseTraineeCreate("trainee create Hulk Hogan 21-04-1995 New York");
 
         assertEquals("Hulk", dto.firstName());
         assertEquals("Hogan", dto.lastName());

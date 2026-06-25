@@ -1,11 +1,11 @@
 package com.example.project_gym.view;
 
-import com.example.project_gym.model.Trainee;
-import com.example.project_gym.model.Trainer;
-import com.example.project_gym.model.UserType;
-import com.example.project_gym.model.User;
-import com.example.project_gym.model.dto.dtoin.LoginResultDto;
-import com.example.project_gym.service.AuthorizationService;
+import com.example.project_gym.domain.entity.TraineeEntity;
+import com.example.project_gym.domain.entity.TrainerEntity;
+import com.example.project_gym.domain.entity.UserType;
+import com.example.project_gym.domain.entity.User;
+import com.example.project_gym.model.request.LoginRequest;
+import com.example.project_gym.service.AuthenticationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,7 +13,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import javax.naming.AuthenticationException;
-import java.util.Date;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -26,10 +25,10 @@ class ConsoleCommandHandlerTest {
     private GuestConsoleCommandService guestConsoleCommandService;
 
     @Mock
-    private AuthorizedProfileConsoleCommandService authorizedProfileConsoleCommandService;
+    private AuthenticatedProfileConsoleCommandService authenticatedProfileConsoleCommandService;
 
     @Mock
-    private AuthorizationService authorizationService;
+    private AuthenticationService authenticationService;
 
     private ConsoleCommandHandler handler;
 
@@ -37,8 +36,8 @@ class ConsoleCommandHandlerTest {
     void setUp() {
         handler = new ConsoleCommandHandler(
                 guestConsoleCommandService,
-                authorizedProfileConsoleCommandService,
-                authorizationService
+                authenticatedProfileConsoleCommandService,
+                authenticationService
         );
     }
 
@@ -74,7 +73,7 @@ class ConsoleCommandHandlerTest {
     void handle_shouldAuthorizeAndSwitchToAuthorizedMode() throws AuthenticationException {
         when(guestConsoleCommandService.isHelpCommand("authorize john 123")).thenReturn(false);
         when(guestConsoleCommandService.isAuthorizeCommand("authorize john 123")).thenReturn(false);
-        when(authorizationService.authenticate(new LoginResultDto("john", "123"))).thenReturn(UserType.TRAINEE);
+        when(authenticationService.authenticate(new LoginRequest("john", "123"))).thenReturn(UserType.TRAINEE);
 
         String output = handler.handle("authorize john 123");
 
@@ -83,16 +82,16 @@ class ConsoleCommandHandlerTest {
 
     @Test
     void handle_shouldProcessGuestTrainerCreate() {
-        Trainer trainer = new Trainer();
+        TrainerEntity trainerEntity = new TrainerEntity();
         User user = new User();
         user.setUserName("Ivan.Ivanov");
         user.setPassword("secret");
-        trainer.setUser(user);
+        trainerEntity.setUser(user);
 
         when(guestConsoleCommandService.isHelpCommand("trainer create ivan ivanov cardio")).thenReturn(false);
         when(guestConsoleCommandService.isAuthorizeCommand("trainer create ivan ivanov cardio")).thenReturn(false);
         when(guestConsoleCommandService.isTrainerCreateCommand("trainer create ivan ivanov cardio")).thenReturn(true);
-        when(guestConsoleCommandService.createTrainer("trainer create Ivan Ivanov CARDIO")).thenReturn(trainer);
+        when(guestConsoleCommandService.createTrainer("trainer create Ivan Ivanov CARDIO")).thenReturn(trainerEntity);
 
         String output = handler.handle("trainer create Ivan Ivanov CARDIO");
 
@@ -101,17 +100,17 @@ class ConsoleCommandHandlerTest {
 
     @Test
     void handle_shouldProcessGuestTraineeCreate() {
-        Trainee trainee = new Trainee();
+        TraineeEntity traineeEntity = new TraineeEntity();
         User user = new User();
         user.setUserName("Ann.Lee");
         user.setPassword("secret");
-        trainee.setUser(user);
+        traineeEntity.setUser(user);
 
         when(guestConsoleCommandService.isHelpCommand("trainee create ann lee 2025-01-20 new york")).thenReturn(false);
         when(guestConsoleCommandService.isAuthorizeCommand("trainee create ann lee 2025-01-20 new york")).thenReturn(false);
         when(guestConsoleCommandService.isTrainerCreateCommand("trainee create ann lee 2025-01-20 new york")).thenReturn(false);
         when(guestConsoleCommandService.isTraineeCreateCommand("trainee create ann lee 2025-01-20 new york")).thenReturn(true);
-        when(guestConsoleCommandService.createTrainee("trainee create Ann Lee 2025-01-20 New York")).thenReturn(trainee);
+        when(guestConsoleCommandService.createTrainee("trainee create Ann Lee 2025-01-20 New York")).thenReturn(traineeEntity);
 
         String output = handler.handle("trainee create Ann Lee 2025-01-20 New York");
 
@@ -122,7 +121,7 @@ class ConsoleCommandHandlerTest {
     void handle_shouldHandleAuthorizedHelpAfterLogin() throws AuthenticationException {
         when(guestConsoleCommandService.isHelpCommand("authorize john 123")).thenReturn(false);
         when(guestConsoleCommandService.isAuthorizeCommand("authorize john 123")).thenReturn(false);
-        when(authorizationService.authenticate(new LoginResultDto("john", "123"))).thenReturn(UserType.TRAINER);
+        when(authenticationService.authenticate(new LoginRequest("john", "123"))).thenReturn(UserType.TRAINER);
 
         handler.handle("authorize john 123");
         String output = handler.handle("help");
@@ -135,7 +134,7 @@ class ConsoleCommandHandlerTest {
     void handle_shouldLogoutFromAuthorizedMode() throws AuthenticationException {
         when(guestConsoleCommandService.isHelpCommand("authorize john 123")).thenReturn(false);
         when(guestConsoleCommandService.isAuthorizeCommand("authorize john 123")).thenReturn(false);
-        when(authorizationService.authenticate(new LoginResultDto("john", "123"))).thenReturn(UserType.TRAINEE);
+        when(authenticationService.authenticate(new LoginRequest("john", "123"))).thenReturn(UserType.TRAINEE);
 
         handler.handle("authorize john 123");
         String output = handler.handle("logout");
