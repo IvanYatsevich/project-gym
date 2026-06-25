@@ -1,12 +1,12 @@
 package com.example.project_gym.view;
 
-import com.example.project_gym.model.Trainee;
-import com.example.project_gym.model.Trainer;
-import com.example.project_gym.model.dto.dtoin.TraineeDtoIn;
-import com.example.project_gym.model.dto.dtoin.TrainerDtoIn;
+import com.example.project_gym.domain.entity.TraineeEntity;
+import com.example.project_gym.domain.entity.TrainerEntity;
+import com.example.project_gym.model.request.CreateTraineeRequest;
+import com.example.project_gym.model.request.CreateTrainerRequest;
 import com.example.project_gym.service.TraineeService;
 import com.example.project_gym.service.TrainerService;
-import com.example.project_gym.utilservices.unauthservices.ProfileCreationParserService;
+import com.example.project_gym.utilservices.guestservices.ProfileCreationParserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,27 +41,27 @@ class GuestConsoleCommandServiceTest {
 
     @Test
     void createTrainer_shouldDelegate() {
-        TrainerDtoIn dto = new TrainerDtoIn("Ivan", "Ivanov", "CARDIO");
-        Trainer trainer = new Trainer();
+        CreateTrainerRequest dto = new CreateTrainerRequest("Ivan", "Ivanov", "CARDIO");
+        TrainerEntity trainerEntity = new TrainerEntity();
         when(parser.parseTrainerCreate("trainer create Ivan Ivanov CARDIO")).thenReturn(dto);
-        when(trainerService.create(dto)).thenReturn(trainer);
+        when(trainerService.create(dto)).thenReturn(trainerEntity);
 
-        Trainer result = service.createTrainer("trainer create Ivan Ivanov CARDIO");
+        TrainerEntity result = service.createTrainer("trainer create Ivan Ivanov CARDIO");
 
-        assertSame(trainer, result);
+        assertSame(trainerEntity, result);
         verify(trainerService).create(dto);
     }
 
     @Test
     void createTrainee_shouldDelegate() {
-        TraineeDtoIn dto = new TraineeDtoIn("Hulk", "Hogan", null, null);
-        Trainee trainee = new Trainee();
+        CreateTraineeRequest dto = new CreateTraineeRequest("Hulk", "Hogan", null, null);
+        TraineeEntity traineeEntity = new TraineeEntity();
         when(parser.parseTraineeCreate("trainee create Hulk Hogan")).thenReturn(dto);
-        when(traineeService.create(dto)).thenReturn(trainee);
+        when(traineeService.create(dto)).thenReturn(traineeEntity);
 
-        Trainee result = service.createTrainee("trainee create Hulk Hogan");
+        TraineeEntity result = service.createTrainee("trainee create Hulk Hogan");
 
-        assertSame(trainee, result);
+        assertSame(traineeEntity, result);
         verify(traineeService).create(dto);
     }
 }
