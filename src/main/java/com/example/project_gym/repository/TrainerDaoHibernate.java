@@ -1,55 +1,56 @@
 package com.example.project_gym.repository;
 
-import com.example.project_gym.model.Trainer;
-import com.example.project_gym.model.Training;
-import com.example.project_gym.repository.idao.ITrainerDAO;
+import com.example.project_gym.domain.entity.TrainerEntity;
+import com.example.project_gym.domain.entity.TrainingEntity;
+import com.example.project_gym.repository.idao.TrainerDAO;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.TypedQuery;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
+import java.util.ArrayList;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 @Repository
-@Transactional
 @Primary
-public class TrainerDaoHibernate implements ITrainerDAO {
+public class TrainerDaoHibernate implements TrainerDAO {
 
     @PersistenceContext
     private EntityManager entityManager;
 
     @Override
-    public Trainer create(Trainer trainer) {
-        entityManager.persist(trainer);
-        return trainer;
+    public TrainerEntity create(TrainerEntity trainerEntity) {
+        entityManager.persist(trainerEntity);
+        return trainerEntity;
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public Optional<Trainer> selectById(Long id) {
-        return Optional.ofNullable(entityManager.find(Trainer.class, id));
+    public Optional<TrainerEntity> findById(Long id) {
+        return Optional.ofNullable(entityManager.find(TrainerEntity.class, id));
     }
 
     @Override
-    public Trainer update(Trainer trainer) {
-        return entityManager.merge(trainer);
+    public TrainerEntity update(TrainerEntity trainerEntity) {
+        return entityManager.merge(trainerEntity);
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public Optional<Trainer> selectByUsername(String username) {
-        TypedQuery<Trainer> query = entityManager.createQuery("SELECT t FROM Trainer t WHERE t.user.userName = :userName", Trainer.class);
+    public Optional<TrainerEntity> findByUsername(String username) {
+        TypedQuery<TrainerEntity> query = entityManager.createQuery("SELECT t FROM TrainerEntity t WHERE t.user.userName = :userName", TrainerEntity.class);
         query.setParameter("userName", username);
         return query.getResultList().stream().findFirst();
     }
 
     @Override
     public boolean deleteByUsername(String username) {
-        Optional<Trainer> trainer = selectByUsername(username);
+        Optional<TrainerEntity> trainer = findByUsername(username);
         if (trainer.isPresent()) {
             entityManager.remove(trainer.get());
             return true;
@@ -58,41 +59,28 @@ public class TrainerDaoHibernate implements ITrainerDAO {
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public List<Training> getTrainings(String trainerUsername, Date fromDate, Date toDate, String traineeName) {
-        StringBuilder query = getTrainerTrainings(fromDate, toDate, traineeName);
-        TypedQuery<Training> typedQuery = entityManager.createQuery(query.toString(), Training.class);
-        validateAndSetTrainingParameters(trainerUsername, fromDate, toDate, traineeName, typedQuery);
+    public List<TrainingEntity> getTrainings(String trainerUsername, LocalDateTime fromDate, LocalDateTime toDate, String traineeName) {
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<TrainingEntity> cq = cb.createQuery(TrainingEntity.class);
+        Root<TrainingEntity> training = cq.from(TrainingEntity.class);
 
-        return typedQuery.getResultList();
-    }
-
-    private static void validateAndSetTrainingParameters(String trainerUsername, Date fromDate, Date toDate, String traineeName, TypedQuery<Training> typedQuery) {
-        typedQuery.setParameter("trainerUsername", trainerUsername);
+        List<Predicate> predicates = new ArrayList<>();
+        predicates.add(cb.equal(training.get("trainerEntity").get("user").get("userName"), trainerUsername));
 
         if (fromDate != null) {
-            typedQuery.setParameter("fromDate", fromDate);
+            predicates.add(cb.greaterThanOrEqualTo(training.get("trainingDate"), fromDate));
         }
         if (toDate != null) {
-            typedQuery.setParameter("toDate", toDate);
+            predicates.add(cb.lessThanOrEqualTo(training.get("trainingDate"), toDate));
         }
         if (traineeName != null && !traineeName.isEmpty()) {
-            typedQuery.setParameter("traineeName", "%" + traineeName + "%");
+            String pattern = "%" + traineeName.toLowerCase() + "%";
+            Predicate byFirstName = cb.like(cb.lower(training.get("traineeEntity").get("user").get("firstName")), pattern);
+            Predicate byLastName = cb.like(cb.lower(training.get("traineeEntity").get("user").get("lastName")), pattern);
+            predicates.add(cb.or(byFirstName, byLastName));
         }
-    }
 
-    private static StringBuilder getTrainerTrainings(Date fromDate, Date toDate, String traineeName) {
-        StringBuilder query = new StringBuilder("SELECT tr FROM Training tr WHERE tr.trainer.user.userName = :trainerUsername");
-
-        if (fromDate != null) {
-            query.append(" AND tr.trainingDate >= :fromDate");
-        }
-        if (toDate != null) {
-            query.append(" AND tr.trainingDate <= :toDate");
-        }
-        if (traineeName != null && !traineeName.isEmpty()) {
-            query.append(" AND (LOWER(tr.trainee.user.firstName) LIKE LOWER(:traineeName) OR LOWER(tr.trainee.user.lastName) LIKE LOWER(:traineeName))");
-        }
-        return query;
+        cq.select(training).where(cb.and(predicates.toArray(new Predicate[0])));
+        return entityManager.createQuery(cq).getResultList();
     }
 }

@@ -1,18 +1,21 @@
 package com.example.project_gym.service;
 
-import com.example.project_gym.model.Trainee;
-import com.example.project_gym.model.Trainer;
-import com.example.project_gym.model.Training;
-import com.example.project_gym.model.User;
-import com.example.project_gym.model.dto.dtoin.PasswordChangeDto;
-import com.example.project_gym.model.dto.dtoin.TraineeDtoIn;
-import com.example.project_gym.model.dto.dtoin.TrainingFilterDto;
-import com.example.project_gym.model.dto.dtoupdate.TraineeUpdateDto;
-import com.example.project_gym.repository.idao.ITraineeDAO;
-import com.example.project_gym.utilservices.authservices.PasswordChangeService;
-import com.example.project_gym.utilservices.unauthservices.password.PasswordGenerator;
-import com.example.project_gym.utilservices.unauthservices.username.UniqueUserNameGenerator;
+import com.example.project_gym.domain.entity.TraineeEntity;
+import com.example.project_gym.domain.entity.TrainerEntity;
+import com.example.project_gym.domain.entity.TrainingEntity;
+import com.example.project_gym.domain.entity.User;
+import com.example.project_gym.model.request.PasswordChangeRequest;
+import com.example.project_gym.model.request.CreateTraineeRequest;
+import com.example.project_gym.model.request.TraineeTrainingsFilterRequest;
+import com.example.project_gym.model.request.UpdateTraineeRequest;
+import com.example.project_gym.repository.idao.TraineeDAO;
+import com.example.project_gym.security.AuthenticationGuard;
+import com.example.project_gym.security.AuthorizationContext;
+import com.example.project_gym.utilservices.authenticatedservices.PasswordChangeService;
+import com.example.project_gym.utilservices.guestservices.password.PasswordGenerator;
+import com.example.project_gym.utilservices.guestservices.username.UniqueUserNameGenerator;
 import jakarta.persistence.EntityNotFoundException;
+import lombok.Setter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,13 +27,18 @@ import java.util.List;
 public class TraineeService {
 
     @Autowired
-    private ITraineeDAO traineeDao;
+    private TraineeDAO traineeDao;
 
     @Autowired
     private PasswordChangeService passwordChangeService;
 
+    @Setter
     private UniqueUserNameGenerator nameGenerator;
+
+    @Setter
     private PasswordGenerator passwordGenerator;
+
+    private AuthenticationGuard authGuard;
 
     @Autowired
     public void setUserNameGenerator(UniqueUserNameGenerator nameGenerator) {
@@ -38,71 +46,72 @@ public class TraineeService {
     }
 
     @Autowired
-    public void setPasswordGenerator(PasswordGenerator passwordGenerator) {
-        this.passwordGenerator = passwordGenerator;
+    public void setAuthenticationGuard(AuthenticationGuard authGuard) {
+        this.authGuard = authGuard;
     }
 
-    public Trainee create(TraineeDtoIn traineeDtoIn) {
-        validateTraineeDtoInput(traineeDtoIn);
+    @Transactional
+    public TraineeEntity create(CreateTraineeRequest createTraineeRequest) {
+        validateTraineeDtoInput(createTraineeRequest);
 
-        Trainee trainee = new Trainee();
+        TraineeEntity traineeEntity = new TraineeEntity();
         User user = new User();
 
-        user.setFirstName(traineeDtoIn.firstName());
-        user.setLastName(traineeDtoIn.lastName());
-        user.setUserName(nameGenerator.generateUnique(traineeDtoIn.firstName(), traineeDtoIn.lastName()));
+        user.setFirstName(createTraineeRequest.firstName());
+        user.setLastName(createTraineeRequest.lastName());
+        user.setUserName(nameGenerator.generateUnique(createTraineeRequest.firstName(), createTraineeRequest.lastName()));
         user.setPassword(passwordGenerator.generatePassword());
         user.setActive(true);
 
-        trainee.setDateOfBirth(traineeDtoIn.dateOfBirth());
-        trainee.setAddress(traineeDtoIn.address());
-        trainee.setUser(user);
-        traineeDao.create(trainee);
-        return trainee;
+        traineeEntity.setDateOfBirth(createTraineeRequest.dateOfBirth());
+        traineeEntity.setAddress(createTraineeRequest.address());
+        traineeEntity.setUser(user);
+        traineeDao.create(traineeEntity);
+        return traineeEntity;
     }
 
     @Transactional(readOnly = true)
-    public Trainee selectByUsername(String username) {
-        return traineeDao.selectByUsername(username)
+    public TraineeEntity selectByUsername(String username) {
+        authGuard.requireAuthenticated();
+        return traineeDao.findByUsername(username)
                 .orElseThrow(() -> new EntityNotFoundException("Trainee with username " + username + " not found"));
     }
 
-    @Transactional(readOnly = true)
-    public boolean authenticate(String username, String password) {
-        return traineeDao.selectByUsername(username)
-                .map(trainee -> trainee.getUser().getPassword().equals(password))
-                .orElseThrow(() -> new IllegalArgumentException("Username or password are invalid"));
+
+    public void changePassword(PasswordChangeRequest passwordChangeRequest) {
+        authGuard.requireAuthenticated();
+        passwordChangeService.changeTraineePassword(passwordChangeRequest);
     }
+    @Transactional
+    public TraineeEntity update(Long id, UpdateTraineeRequest updateTraineeRequest) {
+        authGuard.requireAuthenticated();
+        validateTraineeUpdateDto(updateTraineeRequest);
+        TraineeEntity existingTraineeEntity = traineeDao.findById(id).orElseThrow(() -> new EntityNotFoundException("Trainee not found"));
 
-    public void changePassword(PasswordChangeDto passwordChangeDto) {
-        passwordChangeService.changeTraineePassword(passwordChangeDto);
+        existingTraineeEntity.getUser().setActive(updateTraineeRequest.isActive());
+        existingTraineeEntity.setAddress(updateTraineeRequest.address());
+        existingTraineeEntity.setDateOfBirth(updateTraineeRequest.dateOfBirth());
+
+        traineeDao.update(existingTraineeEntity);
+        return existingTraineeEntity;
     }
-
-    public Trainee update(Long id, TraineeUpdateDto traineeUpdateDto) {
-        validateTraineeUpdateDto(traineeUpdateDto);
-        Trainee existingTrainee = traineeDao.selectById(id).orElseThrow(() -> new EntityNotFoundException("Trainee not found"));
-
-        existingTrainee.getUser().setActive(traineeUpdateDto.isActive());
-        existingTrainee.setAddress(traineeUpdateDto.address());
-        existingTrainee.setDateOfBirth(traineeUpdateDto.dateOfBirth());
-
-        traineeDao.update(existingTrainee);
-        return existingTrainee;
-    }
-
-    public Trainee toggleActive(String username) {
-        Trainee trainee = selectByUsername(username);
-        trainee.getUser().setActive(!trainee.getUser().isActive());
-        traineeDao.update(trainee);
-        return trainee;
+    @Transactional
+    public TraineeEntity toggleActive(String username) {
+        authGuard.requireAuthenticated();
+        TraineeEntity traineeEntity = selectByUsername(username);
+        traineeEntity.getUser().setActive(!traineeEntity.getUser().isActive());
+        traineeDao.update(traineeEntity);
+        return traineeEntity;
     }
 
     public boolean deleteByUsername(String username) {
+        authGuard.requireAuthenticated();
         return traineeDao.deleteByUsername(username);
     }
 
     @Transactional(readOnly = true)
-    public List<Training> getTrainings(TrainingFilterDto filterDto) {
+    public List<TrainingEntity> getTrainings(TraineeTrainingsFilterRequest filterDto) {
+        authGuard.requireAuthenticated();
         return traineeDao.getTrainings(
             filterDto.traineeUsername(),
             filterDto.fromDate(),
@@ -113,39 +122,44 @@ public class TraineeService {
     }
 
     @Transactional(readOnly = true)
-    public List<Trainer> getUnassignedTrainers(String traineeUsername) {
+    public List<TrainerEntity> getUnassignedTrainers(String traineeUsername) {
+        authGuard.requireAuthenticated();
         return traineeDao.findUnassignedTrainers(traineeUsername);
     }
-
-    public void updateTrainersList(String traineeUsername, List<Trainer> trainers) {
-        Trainee trainee = selectByUsername(traineeUsername);
-        traineeDao.updateTrainersList(trainee, trainers);
+    @Transactional
+    public void updateTrainersList(String traineeUsername, List<TrainerEntity> trainerEntities) {
+        authGuard.requireAuthenticated();
+        TraineeEntity traineeEntity = selectByUsername(traineeUsername);
+        traineeDao.updateTrainersList(traineeEntity, trainerEntities);
     }
 
     @Transactional(readOnly = true)
-    public Trainee select(Long id) {
-        return traineeDao.selectById(id)
+    public TraineeEntity select(Long id) {
+        authGuard.requireAuthenticated();
+        return traineeDao.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Trainee not found"));
     }
 
+    @Transactional
     public boolean delete(Long id) {
+        authGuard.requireAuthenticated();
         return traineeDao.delete(id);
     }
 
-    private void validateTraineeDtoInput(TraineeDtoIn traineeDtoIn) {
-        if (traineeDtoIn.firstName() == null || traineeDtoIn.firstName().trim().isEmpty()) {
+    private void validateTraineeDtoInput(CreateTraineeRequest createTraineeRequest) {
+        if (createTraineeRequest.firstName() == null || createTraineeRequest.firstName().trim().isEmpty()) {
             throw new IllegalArgumentException("First name is required");
         }
-        if (traineeDtoIn.lastName() == null || traineeDtoIn.lastName().trim().isEmpty()) {
+        if (createTraineeRequest.lastName() == null || createTraineeRequest.lastName().trim().isEmpty()) {
             throw new IllegalArgumentException("Last name is required");
         }
     }
 
-    private void validateTraineeUpdateDto(TraineeUpdateDto traineeUpdateDto) {
-        if (traineeUpdateDto == null) {
+    private void validateTraineeUpdateDto(UpdateTraineeRequest updateTraineeRequest) {
+        if (updateTraineeRequest == null) {
             throw new IllegalArgumentException("Trainee update data is required");
         }
-        if (traineeUpdateDto.isActive() == null) {
+        if (updateTraineeRequest.isActive() == null) {
             throw new IllegalArgumentException("isActive is required");
         }
     }

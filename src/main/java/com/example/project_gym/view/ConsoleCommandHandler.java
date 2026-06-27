@@ -1,33 +1,36 @@
 package com.example.project_gym.view;
 
 
-import com.example.project_gym.model.Trainee;
-import com.example.project_gym.model.Trainer;
-import com.example.project_gym.model.UserType;
-import com.example.project_gym.model.dto.dtoin.LoginResultDto;
-import com.example.project_gym.service.AuthorizationService;
+import com.example.project_gym.domain.entity.TraineeEntity;
+import com.example.project_gym.domain.entity.TrainerEntity;
+import com.example.project_gym.domain.entity.TrainingEntity;
+import com.example.project_gym.domain.entity.UserType;
+import com.example.project_gym.model.request.LoginRequest;
+import com.example.project_gym.service.AuthenticationService;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Component;
 
 import javax.naming.AuthenticationException;
+import java.util.List;
 import java.util.Locale;
+import java.util.stream.Collectors;
 
 
 @Component
 public class ConsoleCommandHandler {
 
     private final GuestConsoleCommandService guestConsoleCommandService;
-    private final AuthorizedProfileConsoleCommandService authorizedProfileConsoleCommandService;
-    private final AuthorizationService authorizationService;
+    private final AuthenticatedProfileConsoleCommandService authenticatedProfileConsoleCommandService;
+    private final AuthenticationService authenticationService;
     private UserType currentUserType = UserType.UNKNOWN;
     private String authorizedUsername;
 
     public ConsoleCommandHandler(GuestConsoleCommandService guestConsoleCommandService,
-                                 AuthorizedProfileConsoleCommandService authorizedProfileConsoleCommandService,
-                                 AuthorizationService authorizationService) {
+                                 AuthenticatedProfileConsoleCommandService authenticatedProfileConsoleCommandService,
+                                 AuthenticationService authenticationService) {
         this.guestConsoleCommandService = guestConsoleCommandService;
-        this.authorizedProfileConsoleCommandService = authorizedProfileConsoleCommandService;
-        this.authorizationService = authorizationService;
+        this.authenticatedProfileConsoleCommandService = authenticatedProfileConsoleCommandService;
+        this.authenticationService = authenticationService;
     }
 
     public String handle(String input) {
@@ -39,7 +42,7 @@ public class ConsoleCommandHandler {
         String command = trimmedInput.toLowerCase(Locale.ROOT);
 
         if (guestConsoleCommandService.isExitCommand(command)
-                || authorizedProfileConsoleCommandService.isExitCommand(command)) {
+                || authenticatedProfileConsoleCommandService.isExitCommand(command)) {
             return "exit";
         }
 
@@ -59,14 +62,14 @@ public class ConsoleCommandHandler {
                 case "authorize-usage" -> "Use: authorize <username> <password>";
                 case "authorize" -> authorize(trimmedInput);
                 case "trainer-create" -> {
-                    Trainer trainer = guestConsoleCommandService.createTrainer(trimmedInput);
-                    yield "Trainer created: " + trainer.getUser().getUserName() +
-                            " password: " + trainer.getUser().getPassword();
+                    TrainerEntity trainerEntity = guestConsoleCommandService.createTrainer(trimmedInput);
+                    yield "Trainer created: " + trainerEntity.getUser().getUserName() +
+                            " password: " + trainerEntity.getUser().getPassword();
                 }
                 case "trainee-create" -> {
-                    Trainee trainee = guestConsoleCommandService.createTrainee(trimmedInput);
-                    yield "Trainee created: " + trainee.getUser().getUserName() +
-                            " password: " + trainee.getUser().getPassword();
+                    TraineeEntity traineeEntity = guestConsoleCommandService.createTrainee(trimmedInput);
+                    yield "Trainee created: " + traineeEntity.getUser().getUserName() +
+                            " password: " + traineeEntity.getUser().getPassword();
                 }
                 default -> "Unknown command. Type 'help'.";
             };
@@ -81,32 +84,32 @@ public class ConsoleCommandHandler {
             return switch (commandKey) {
                 case "help" -> showAuthorizedHelp();
                 case "logout" -> logout();
-                case "trainer-select" -> "Selected trainer: " + authorizedProfileConsoleCommandService.selectTrainer(trimmedInput).getUser().getUserName();
-                case "trainee-select" -> "Selected trainee: " + authorizedProfileConsoleCommandService.selectTrainee(trimmedInput).getUser().getUserName();
+                case "trainer-select" -> "Selected trainer: " + authenticatedProfileConsoleCommandService.selectTrainer(trimmedInput).getUser().getUserName();
+                case "trainee-select" -> "Selected trainee: " + authenticatedProfileConsoleCommandService.selectTrainee(trimmedInput).getUser().getUserName();
                 case "trainee-password-change" -> {
-                    authorizedProfileConsoleCommandService.changeTraineePassword(trimmedInput);
+                    authenticatedProfileConsoleCommandService.changeTraineePassword(trimmedInput);
                     yield "Trainee password changed.";
                 }
                 case "trainer-password-change" -> {
-                    authorizedProfileConsoleCommandService.changeTrainerPassword(trimmedInput);
+                    authenticatedProfileConsoleCommandService.changeTrainerPassword(trimmedInput);
                     yield "Trainer password changed.";
                 }
-                case "trainer-update" -> "Updated trainer: " + authorizedProfileConsoleCommandService.updateTrainer(trimmedInput).getId();
-                case "trainee-update" -> "Updated trainee: " + authorizedProfileConsoleCommandService.updateTrainee(trimmedInput).getId();
-                case "trainee-activate" -> "Activated trainee: " + authorizedProfileConsoleCommandService.activateTrainee(trimmedInput).getUser().getUserName();
-                case "trainee-deactivate" -> "Deactivated trainee: " + authorizedProfileConsoleCommandService.deactivateTrainee(trimmedInput).getUser().getUserName();
-                case "trainer-activate" -> "Activated trainer: " + authorizedProfileConsoleCommandService.activateTrainer(trimmedInput).getUser().getUserName();
-                case "trainer-deactivate" -> "Deactivated trainer: " + authorizedProfileConsoleCommandService.deactivateTrainer(trimmedInput).getUser().getUserName();
-                case "trainee-delete" -> authorizedProfileConsoleCommandService.deleteTrainee(trimmedInput)
+                case "trainer-update" -> "Updated trainer: " + authenticatedProfileConsoleCommandService.updateTrainer(trimmedInput).getId();
+                case "trainee-update" -> "Updated trainee: " + authenticatedProfileConsoleCommandService.updateTrainee(trimmedInput).getId();
+                case "trainee-activate" -> "Activated trainee: " + authenticatedProfileConsoleCommandService.activateTrainee(trimmedInput).getUser().getUserName();
+                case "trainee-deactivate" -> "Deactivated trainee: " + authenticatedProfileConsoleCommandService.deactivateTrainee(trimmedInput).getUser().getUserName();
+                case "trainer-activate" -> "Activated trainer: " + authenticatedProfileConsoleCommandService.activateTrainer(trimmedInput).getUser().getUserName();
+                case "trainer-deactivate" -> "Deactivated trainer: " + authenticatedProfileConsoleCommandService.deactivateTrainer(trimmedInput).getUser().getUserName();
+                case "trainee-delete" -> authenticatedProfileConsoleCommandService.deleteTrainee(trimmedInput)
                         ? "Trainee deleted."
                         : "Trainee not found.";
-                case "trainee-trainings" -> "Trainee trainings: " + authorizedProfileConsoleCommandService.getTraineeTrainings(trimmedInput).size();
-                case "trainer-trainings" -> "Trainer trainings: " + authorizedProfileConsoleCommandService.getTrainerTrainings(trimmedInput).size();
-                case "training-add" -> "Created training: " + authorizedProfileConsoleCommandService.addTraining(trimmedInput).getId();
-                case "trainee-unassigned-trainers" -> "Unassigned trainers: " + authorizedProfileConsoleCommandService.getUnassignedTrainers(trimmedInput).size();
+                case "trainee-trainings" -> formatTraineeTrainings(trimmedInput);
+                case "trainer-trainings" -> formatTrainerTrainings(trimmedInput);
+                case "training-add" -> "Created training: " + authenticatedProfileConsoleCommandService.addTraining(trimmedInput).getId();
+                case "trainee-unassigned-trainers" -> formatUnassignedTrainers(trimmedInput);
                 case "trainee-trainers-update" -> {
-                    authorizedProfileConsoleCommandService.updateTraineesTrainers(trimmedInput);
-                    yield "Trainee trainers list updated.";
+                    authenticatedProfileConsoleCommandService.updateTraineesTrainers(trimmedInput);
+                    yield "Trainee trainer list updated.";
                 }
                 default -> "Unknown authorized command. Type 'help'.";
             };
@@ -141,52 +144,52 @@ public class ConsoleCommandHandler {
         if ("logout".equals(command)) {
             return "logout";
         }
-        if (authorizedProfileConsoleCommandService.isSelectTrainerCommand(command)) {
+        if (authenticatedProfileConsoleCommandService.isSelectTrainerCommand(command)) {
             return "trainer-select";
         }
-        if (authorizedProfileConsoleCommandService.isSelectTraineeCommand(command)) {
+        if (authenticatedProfileConsoleCommandService.isSelectTraineeCommand(command)) {
             return "trainee-select";
         }
-        if (authorizedProfileConsoleCommandService.isTraineePasswordChangeCommand(command)) {
+        if (authenticatedProfileConsoleCommandService.isTraineePasswordChangeCommand(command)) {
             return "trainee-password-change";
         }
-        if (authorizedProfileConsoleCommandService.isTrainerPasswordChangeCommand(command)) {
+        if (authenticatedProfileConsoleCommandService.isTrainerPasswordChangeCommand(command)) {
             return "trainer-password-change";
         }
-        if (authorizedProfileConsoleCommandService.isUpdateTrainerCommand(command)) {
+        if (authenticatedProfileConsoleCommandService.isUpdateTrainerCommand(command)) {
             return "trainer-update";
         }
-        if (authorizedProfileConsoleCommandService.isUpdateTraineeCommand(command)) {
+        if (authenticatedProfileConsoleCommandService.isUpdateTraineeCommand(command)) {
             return "trainee-update";
         }
-        if (authorizedProfileConsoleCommandService.isActivateTraineeCommand(command)) {
+        if (authenticatedProfileConsoleCommandService.isActivateTraineeCommand(command)) {
             return "trainee-activate";
         }
-        if (authorizedProfileConsoleCommandService.isDeactivateTraineeCommand(command)) {
+        if (authenticatedProfileConsoleCommandService.isDeactivateTraineeCommand(command)) {
             return "trainee-deactivate";
         }
-        if (authorizedProfileConsoleCommandService.isActivateTrainerCommand(command)) {
+        if (authenticatedProfileConsoleCommandService.isActivateTrainerCommand(command)) {
             return "trainer-activate";
         }
-        if (authorizedProfileConsoleCommandService.isDeactivateTrainerCommand(command)) {
+        if (authenticatedProfileConsoleCommandService.isDeactivateTrainerCommand(command)) {
             return "trainer-deactivate";
         }
-        if (authorizedProfileConsoleCommandService.isDeleteTraineeCommand(command)) {
+        if (authenticatedProfileConsoleCommandService.isDeleteTraineeCommand(command)) {
             return "trainee-delete";
         }
-        if (authorizedProfileConsoleCommandService.isGetTraineeTrainingsCommand(command)) {
+        if (authenticatedProfileConsoleCommandService.isGetTraineeTrainingsCommand(command)) {
             return "trainee-trainings";
         }
-        if (authorizedProfileConsoleCommandService.isGetTrainerTrainingsCommand(command)) {
+        if (authenticatedProfileConsoleCommandService.isGetTrainerTrainingsCommand(command)) {
             return "trainer-trainings";
         }
-        if (authorizedProfileConsoleCommandService.isAddTrainingCommand(command)) {
+        if (authenticatedProfileConsoleCommandService.isAddTrainingCommand(command)) {
             return "training-add";
         }
-        if (authorizedProfileConsoleCommandService.isGetUnassignedTrainersCommand(command)) {
+        if (authenticatedProfileConsoleCommandService.isGetUnassignedTrainersCommand(command)) {
             return "trainee-unassigned-trainers";
         }
-        if (authorizedProfileConsoleCommandService.isUpdateTraineesTrainersCommand(command)) {
+        if (authenticatedProfileConsoleCommandService.isUpdateTraineesTrainersCommand(command)) {
             return "trainee-trainers-update";
         }
         return "unknown";
@@ -194,6 +197,7 @@ public class ConsoleCommandHandler {
 
     private String logout() {
         UserType previousType = currentUserType;
+        authenticationService.logout();
         authorizedUsername = null;
         currentUserType = UserType.UNKNOWN;
         return "Logged out from " + previousType + " profile.";
@@ -206,8 +210,8 @@ public class ConsoleCommandHandler {
         }
 
         try {
-            LoginResultDto loginResultDto = new LoginResultDto(parts[1], parts[2]);
-            currentUserType = authorizationService.authenticate(loginResultDto);
+            LoginRequest loginRequest = new LoginRequest(parts[1], parts[2]);
+            currentUserType = authenticationService.authenticate(loginRequest);
             authorizedUsername = parts[1];
             return "Authorized as " + currentUserType + ": " + authorizedUsername + ". Type 'help' for available commands.";
         } catch (AuthenticationException e) {
@@ -219,6 +223,48 @@ public class ConsoleCommandHandler {
         return currentUserType == UserType.TRAINER || currentUserType == UserType.TRAINEE;
     }
 
+    private String formatTraineeTrainings(String command) {
+        return formatTrainings(
+                "Trainee trainings",
+                authenticatedProfileConsoleCommandService.getTraineeTrainings(command)
+        );
+    }
+
+    private String formatTrainerTrainings(String command) {
+        return formatTrainings(
+                "Trainer trainings",
+                authenticatedProfileConsoleCommandService.getTrainerTrainings(command)
+        );
+    }
+
+    private String formatUnassignedTrainers(String command) {
+        List<TrainerEntity> trainers = authenticatedProfileConsoleCommandService.getUnassignedTrainers(command);
+        if (trainers.isEmpty()) {
+            return "Unassigned trainers: none";
+        }
+
+        String formatted = trainers.stream()
+                .map(trainer -> trainer.getUser().getFirstName() + " "
+                        + trainer.getUser().getLastName() + " (" + trainer.getUser().getUserName() + ")")
+                .collect(Collectors.joining(", "));
+        return "Unassigned trainers: " + formatted;
+    }
+
+    private String formatTrainings(String label, List<TrainingEntity> trainings) {
+        if (trainings.isEmpty()) {
+            return label + ": none";
+        }
+
+        String formatted = trainings.stream()
+                .map(training -> training.getTrainingName()
+                        + " [trainer=" + training.getTrainerEntity().getUser().getUserName()
+                        + ", trainee=" + training.getTraineeEntity().getUser().getUserName()
+                        + ", date=" + training.getTrainingDate()
+                        + ", duration=" + training.getTrainingDuration() + " min]")
+                .collect(Collectors.joining("; "));
+        return label + ": " + formatted;
+    }
+
     private String showAuthorizedHelp() {
         return """
                 Authorized commands:
@@ -227,13 +273,13 @@ public class ConsoleCommandHandler {
                 trainee password-change <username> <oldPassword> <newPassword>
                 trainer password-change <username> <oldPassword> <newPassword>
                 trainer update <username> [specialization=<type>] [active=true|false]
-                trainee update <username> [address=<value>] [active=true|false] [dateOfBirth=dd-MM-yyy]
+                trainee update <username> [address=<value>] [active=true|false] [dateOfBirth=dd-MM-yyyy]
                 trainee activate <username> | trainee deactivate <username>
                 trainer activate <username> | trainer deactivate <username>
                 trainee delete <username>
-                trainee trainings <username> [fromDate=dd-MM-yyy] [toDate=dd-MM-yyy] [trainerName=<name>] [trainingType=<type>]
-                trainer trainings <username> [fromDate=dd-MM-yyy] [toDate=dd-MM-yyy] [traineeName=<name>]
-                training add <traineeUsername> <trainerUsername> <trainingTypeName> <trainingName> <dd-MM-yyy> <durationMinutes>
+                trainee trainings <username> [fromDate=dd-MM-yyyy] [toDate=dd-MM-yyyy] [trainerName=<name>] [trainingType=<type>]
+                trainer trainings <username> [fromDate=dd-MM-yyyy] [toDate=dd-MM-yyyy] [traineeName=<name>]
+                training add <traineeUsername> <trainerUsername> <trainingTypeName> <trainingName> <dd-MM-yyyy> <durationMinutes>
                 trainee unassigned-trainers <username>
                 trainee trainers-update <username> <trainerUsername1,trainerUsername2,...>
                 logout

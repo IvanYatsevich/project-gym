@@ -1,12 +1,12 @@
 package com.example.project_gym.view;
 
-import com.example.project_gym.model.Trainee;
-import com.example.project_gym.model.Trainer;
-import com.example.project_gym.model.dto.dtoin.TraineeDtoIn;
-import com.example.project_gym.model.dto.dtoin.TrainerDtoIn;
+import com.example.project_gym.domain.entity.TraineeEntity;
+import com.example.project_gym.domain.entity.TrainerEntity;
+import com.example.project_gym.model.request.CreateTraineeRequest;
+import com.example.project_gym.model.request.CreateTrainerRequest;
 import com.example.project_gym.service.TraineeService;
 import com.example.project_gym.service.TrainerService;
-import com.example.project_gym.utilservices.unauthservices.ProfileCreationParserService;
+import com.example.project_gym.utilservices.guestservices.ProfileCreationParserService;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -55,13 +55,13 @@ public class GuestConsoleCommandService {
         return command.startsWith("trainee create ");
     }
 
-    public Trainer createTrainer(String input) {
-        TrainerDtoIn dto = profileCreationParserService.parseTrainerCreate(input);
+    public TrainerEntity createTrainer(String input) {
+        CreateTrainerRequest dto = profileCreationParserService.parseTrainerCreate(input);
         return trainerService.create(dto);
     }
 
-    public Trainee createTrainee(String input) {
-        TraineeDtoIn dto = profileCreationParserService.parseTraineeCreate(input);
+    public TraineeEntity createTrainee(String input) {
+        CreateTraineeRequest dto = profileCreationParserService.parseTraineeCreate(input);
         return traineeService.create(dto);
     }
 }
