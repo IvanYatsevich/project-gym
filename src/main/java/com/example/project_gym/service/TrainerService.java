@@ -10,6 +10,7 @@ import com.example.project_gym.model.request.UpdateTrainerRequest;
 import com.example.project_gym.domain.entity.User;
 import com.example.project_gym.repository.idao.TrainerDAO;
 import com.example.project_gym.repository.idao.TrainingTypeDAO;
+import com.example.project_gym.security.AuthenticationGuard;
 import com.example.project_gym.utilservices.authenticatedservices.PasswordChangeService;
 import com.example.project_gym.utilservices.guestservices.password.PasswordGenerator;
 import com.example.project_gym.utilservices.guestservices.username.UniqueUserNameGenerator;
@@ -22,7 +23,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 @Service
-@Transactional
 public class TrainerService {
 
     @Autowired
@@ -34,9 +34,18 @@ public class TrainerService {
     @Autowired
     private PasswordChangeService passwordChangeService;
 
+    @Setter
     private UniqueUserNameGenerator nameGenerator;
+
     @Setter
     private PasswordGenerator passwordGenerator;
+
+    private AuthenticationGuard authGuard;
+
+    @Autowired
+    public void setAuthenticationGuard(AuthenticationGuard authGuard) {
+        this.authGuard = authGuard;
+    }
 
 
     @Autowired
@@ -67,23 +76,19 @@ public class TrainerService {
 
     @Transactional(readOnly = true)
     public TrainerEntity selectByUsername(String username) {
+        authGuard.requireAuthenticated();
         return trainerDao.findByUsername(username)
                 .orElseThrow(() -> new EntityNotFoundException("Trainer with username " + username + " not found"));
     }
 
-//    @Transactional(readOnly = true)
-//    public boolean authenticate(String username, String password) {
-//        return trainerDao.selectByUsername(username)
-//                .map(trainer -> trainer.getUser().getPassword().equals(password))
-//                .orElseThrow(() -> new IllegalArgumentException("Username or password are invalid"));
-//    }
-
     @Transactional
     public void changePassword(PasswordChangeRequest passwordChangeRequest) {
+        authGuard.requireAuthenticated();
         passwordChangeService.changeTrainerPassword(passwordChangeRequest);
     }
     @Transactional
     public TrainerEntity update(Long id, UpdateTrainerRequest updateTrainerRequest) {
+        authGuard.requireAuthenticated();
         validateTrainerUpdateDto(updateTrainerRequest);
         
         TrainerEntity existingTrainerEntity = trainerDao.findById(id)
@@ -97,6 +102,7 @@ public class TrainerService {
     }
     @Transactional
     public TrainerEntity toggleActive(String username) {
+        authGuard.requireAuthenticated();
         TrainerEntity trainerEntity = selectByUsername(username);
         trainerEntity.getUser().setActive(!trainerEntity.getUser().isActive());
         trainerDao.update(trainerEntity);
@@ -105,6 +111,7 @@ public class TrainerService {
 
     @Transactional(readOnly = true)
     public List<TrainingEntity> getTrainings(TrainerTrainingsFilterRequest filterDto) {
+        authGuard.requireAuthenticated();
         return trainerDao.getTrainings(
             filterDto.trainerUsername(),
             filterDto.fromDate(),
@@ -115,6 +122,7 @@ public class TrainerService {
 
     @Transactional(readOnly = true)
     public TrainerEntity select(Long id) {
+        authGuard.requireAuthenticated();
         return trainerDao.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Trainer not found"));
     }

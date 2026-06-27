@@ -9,6 +9,8 @@ import com.example.project_gym.model.request.CreateTraineeRequest;
 import com.example.project_gym.model.request.TraineeTrainingsFilterRequest;
 import com.example.project_gym.model.request.UpdateTraineeRequest;
 import com.example.project_gym.repository.idao.TraineeDAO;
+import com.example.project_gym.security.AuthenticationGuard;
+import com.example.project_gym.security.AuthorizationContext;
 import com.example.project_gym.utilservices.authenticatedservices.PasswordChangeService;
 import com.example.project_gym.utilservices.guestservices.password.PasswordGenerator;
 import com.example.project_gym.utilservices.guestservices.username.UniqueUserNameGenerator;
@@ -30,13 +32,22 @@ public class TraineeService {
     @Autowired
     private PasswordChangeService passwordChangeService;
 
+    @Setter
     private UniqueUserNameGenerator nameGenerator;
+
     @Setter
     private PasswordGenerator passwordGenerator;
+
+    private AuthenticationGuard authGuard;
 
     @Autowired
     public void setUserNameGenerator(UniqueUserNameGenerator nameGenerator) {
         this.nameGenerator = nameGenerator;
+    }
+
+    @Autowired
+    public void setAuthenticationGuard(AuthenticationGuard authGuard) {
+        this.authGuard = authGuard;
     }
 
     @Transactional
@@ -61,22 +72,19 @@ public class TraineeService {
 
     @Transactional(readOnly = true)
     public TraineeEntity selectByUsername(String username) {
+        authGuard.requireAuthenticated();
         return traineeDao.findByUsername(username)
                 .orElseThrow(() -> new EntityNotFoundException("Trainee with username " + username + " not found"));
     }
 
-//    @Transactional(readOnly = true)
-//    public boolean authenticate(String username, String password) {
-//        return traineeDao.selectByUsername(username)
-//                .map(trainee -> trainee.getUser().getPassword().equals(password))
-//                .orElseThrow(() -> new IllegalArgumentException("Username or password are invalid"));
-//    }
 
     public void changePassword(PasswordChangeRequest passwordChangeRequest) {
+        authGuard.requireAuthenticated();
         passwordChangeService.changeTraineePassword(passwordChangeRequest);
     }
     @Transactional
     public TraineeEntity update(Long id, UpdateTraineeRequest updateTraineeRequest) {
+        authGuard.requireAuthenticated();
         validateTraineeUpdateDto(updateTraineeRequest);
         TraineeEntity existingTraineeEntity = traineeDao.findById(id).orElseThrow(() -> new EntityNotFoundException("Trainee not found"));
 
@@ -89,6 +97,7 @@ public class TraineeService {
     }
     @Transactional
     public TraineeEntity toggleActive(String username) {
+        authGuard.requireAuthenticated();
         TraineeEntity traineeEntity = selectByUsername(username);
         traineeEntity.getUser().setActive(!traineeEntity.getUser().isActive());
         traineeDao.update(traineeEntity);
@@ -96,11 +105,13 @@ public class TraineeService {
     }
 
     public boolean deleteByUsername(String username) {
+        authGuard.requireAuthenticated();
         return traineeDao.deleteByUsername(username);
     }
 
     @Transactional(readOnly = true)
     public List<TrainingEntity> getTrainings(TraineeTrainingsFilterRequest filterDto) {
+        authGuard.requireAuthenticated();
         return traineeDao.getTrainings(
             filterDto.traineeUsername(),
             filterDto.fromDate(),
@@ -112,22 +123,26 @@ public class TraineeService {
 
     @Transactional(readOnly = true)
     public List<TrainerEntity> getUnassignedTrainers(String traineeUsername) {
+        authGuard.requireAuthenticated();
         return traineeDao.findUnassignedTrainers(traineeUsername);
     }
     @Transactional
     public void updateTrainersList(String traineeUsername, List<TrainerEntity> trainerEntities) {
+        authGuard.requireAuthenticated();
         TraineeEntity traineeEntity = selectByUsername(traineeUsername);
         traineeDao.updateTrainersList(traineeEntity, trainerEntities);
     }
 
     @Transactional(readOnly = true)
     public TraineeEntity select(Long id) {
+        authGuard.requireAuthenticated();
         return traineeDao.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Trainee not found"));
     }
 
     @Transactional
     public boolean delete(Long id) {
+        authGuard.requireAuthenticated();
         return traineeDao.delete(id);
     }
 

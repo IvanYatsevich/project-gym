@@ -5,11 +5,12 @@ import com.example.project_gym.domain.entity.TrainingEntity;
 import com.example.project_gym.domain.entity.TrainingType;
 import com.example.project_gym.domain.entity.User;
 import com.example.project_gym.model.request.CreateTrainerRequest;
+import com.example.project_gym.model.request.PasswordChangeRequest;
 import com.example.project_gym.model.request.TrainerTrainingsFilterRequest;
 import com.example.project_gym.model.request.UpdateTrainerRequest;
-import com.example.project_gym.model.request.PasswordChangeRequest;
 import com.example.project_gym.repository.idao.TrainerDAO;
 import com.example.project_gym.repository.idao.TrainingTypeDAO;
+import com.example.project_gym.security.AuthenticationGuard;
 import com.example.project_gym.utilservices.authenticatedservices.PasswordChangeService;
 import com.example.project_gym.utilservices.guestservices.password.PasswordGenerator;
 import com.example.project_gym.utilservices.guestservices.username.UniqueUserNameGenerator;
@@ -21,13 +22,15 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -43,6 +46,8 @@ class TrainerEntityServiceTest {
     private UniqueUserNameGenerator userNameGenerator;
     @Mock
     private PasswordGenerator passwordGenerator;
+    @Mock
+    private AuthenticationGuard authGuard;
 
     private TrainerService trainerService;
 
@@ -54,6 +59,7 @@ class TrainerEntityServiceTest {
         ReflectionTestUtils.setField(trainerService, "passwordChangeService", passwordChangeService);
         trainerService.setUserNameGenerator(userNameGenerator);
         trainerService.setPasswordGenerator(passwordGenerator);
+        trainerService.setAuthenticationGuard(authGuard);
     }
 
     @Test
@@ -71,6 +77,7 @@ class TrainerEntityServiceTest {
         assertTrue(result.getUser().isActive());
         assertEquals("CARDIO", result.getTrainingType().getTrainingTypeName());
         verify(trainerDao).create(any(TrainerEntity.class));
+        verifyNoInteractions(authGuard);
     }
 
     @Test
@@ -131,11 +138,25 @@ class TrainerEntityServiceTest {
     @Test
     void getTrainings_shouldDelegateToDao() {
         List<TrainingEntity> trainingEntities = List.of(new TrainingEntity());
-        Date now = new Date();
+        LocalDateTime now = LocalDateTime.now();
         when(trainerDao.getTrainings("ivan", now, now, "petr")).thenReturn(trainingEntities);
 
         List<TrainingEntity> result = trainerService.getTrainings(new TrainerTrainingsFilterRequest("ivan", now, now, "petr"));
 
         assertEquals(1, result.size());
+    }
+
+    @Test
+    void guardedOperations_shouldThrowWhenUnauthenticated() {
+        doThrow(new SecurityException("Authentication required")).when(authGuard).requireAuthenticated();
+
+        assertAll(
+                () -> assertThrows(SecurityException.class, () -> trainerService.selectByUsername("ivan")),
+                () -> assertThrows(SecurityException.class, () -> trainerService.changePassword(new PasswordChangeRequest("ivan", "old", "new"))),
+                () -> assertThrows(SecurityException.class, () -> trainerService.update(1L, new UpdateTrainerRequest(true, "CARDIO"))),
+                () -> assertThrows(SecurityException.class, () -> trainerService.toggleActive("ivan")),
+                () -> assertThrows(SecurityException.class, () -> trainerService.getTrainings(new TrainerTrainingsFilterRequest("ivan", null, null, null))),
+                () -> assertThrows(SecurityException.class, () -> trainerService.select(1L))
+        );
     }
 }

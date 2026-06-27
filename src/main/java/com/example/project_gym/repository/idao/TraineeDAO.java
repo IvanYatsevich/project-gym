@@ -4,7 +4,7 @@ import com.example.project_gym.domain.entity.TraineeEntity;
 import com.example.project_gym.domain.entity.TrainerEntity;
 import com.example.project_gym.domain.entity.TrainingEntity;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -15,7 +15,7 @@ public interface TraineeDAO {
     TraineeEntity update(TraineeEntity traineeEntity);
     Optional<TraineeEntity> findByUsername(String username);
     boolean deleteByUsername(String username);
-    List<TrainingEntity> getTrainings(String traineeUsername, Date fromDate, Date toDate, String trainerName, String trainingType);
+    List<TrainingEntity> getTrainings(String traineeUsername, LocalDateTime fromDate, LocalDateTime toDate, String trainerName, String trainingType);
     List<TrainerEntity> findUnassignedTrainers(String traineeUsername);
     void updateTrainersList(TraineeEntity traineeEntity, List<TrainerEntity> trainerEntities);
 }

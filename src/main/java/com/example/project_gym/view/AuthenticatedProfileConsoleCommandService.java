@@ -18,8 +18,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
@@ -39,7 +40,7 @@ public class AuthenticatedProfileConsoleCommandService {
     private TrainingService trainingService;
 
 
-    private final SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyy", Locale.ROOT);
+    private final SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy", Locale.ROOT);
 
     public AuthenticatedProfileConsoleCommandService() {
         dateFormat.setLenient(false);
@@ -160,7 +161,7 @@ public class AuthenticatedProfileConsoleCommandService {
     public TraineeEntity updateTrainee(String command) {
         String[] parts = command.split("\\s+");
         if (parts.length < 3) {
-            throw new IllegalArgumentException("trainee update <username> [address=<value>] [active=true|false] [dateOfBirth=dd-MM-yyy]");
+            throw new IllegalArgumentException("trainee update <username> [address=<value>] [active=true|false] [dateOfBirth=dd-MM-yyyy]");
         }
 
         String username = parts[2];
@@ -168,7 +169,7 @@ public class AuthenticatedProfileConsoleCommandService {
 
         String address = traineeEntity.getAddress();
         Boolean active = null;
-        Date dateOfBirth = traineeEntity.getDateOfBirth();
+        LocalDateTime dateOfBirth = traineeEntity.getDateOfBirth();
 
         for (int i = 3; i < parts.length; i++) {
             String token = parts[i];
@@ -289,12 +290,12 @@ public class AuthenticatedProfileConsoleCommandService {
     public List<TrainingEntity> getTraineeTrainings(String command) {
         String[] parts = command.split("\\s+");
         if (parts.length < 3) {
-            throw new IllegalArgumentException("trainee trainings <username> [fromDate=dd-MM-yyy] [toDate=dd-MM-yyy] [trainerName=<name>] [trainingType=<type>]");
+            throw new IllegalArgumentException("trainee trainings <username> [fromDate=dd-MM-yyyy] [toDate=dd-MM-yyyy] [trainerName=<name>] [trainingType=<type>]");
         }
 
         String traineeUsername = parts[2];
-        Date fromDate = null;
-        Date toDate = null;
+        LocalDateTime fromDate = null;
+        LocalDateTime toDate = null;
         String trainerName = null;
         String trainingType = null;
 
@@ -302,15 +303,15 @@ public class AuthenticatedProfileConsoleCommandService {
             String token = parts[i];
             if (token.startsWith("fromDate=")) {
                 try {
-                    fromDate = dateFormat.parse(token.substring("fromDate=".length()));
+                    fromDate = toLocalDateTime(dateFormat.parse(token.substring("fromDate=".length())));
                 } catch (Exception e) {
-                    throw new IllegalArgumentException("Invalid date format for fromDate. Use dd-MM-yyy");
+                    throw new IllegalArgumentException("Invalid date format for fromDate. Use dd-MM-yyyy");
                 }
             } else if (token.startsWith("toDate=")) {
                 try {
-                    toDate = dateFormat.parse(token.substring("toDate=".length()));
+                    toDate = toLocalDateTime(dateFormat.parse(token.substring("toDate=".length())));
                 } catch (Exception e) {
-                    throw new IllegalArgumentException("Invalid date format for toDate. Use dd-MM-yyy");
+                    throw new IllegalArgumentException("Invalid date format for toDate. Use dd-MM-yyyy");
                 }
             } else if (token.startsWith("trainerName=")) {
                 trainerName = token.substring("trainerName=".length());
@@ -326,27 +327,27 @@ public class AuthenticatedProfileConsoleCommandService {
     public List<TrainingEntity> getTrainerTrainings(String command) {
         String[] parts = command.split("\\s+");
         if (parts.length < 3) {
-            throw new IllegalArgumentException("trainer trainings <username> [fromDate=dd-MM-yyy] [toDate=dd-MM-yyy] [traineeName=<name>]");
+            throw new IllegalArgumentException("trainer trainings <username> [fromDate=dd-MM-yyyy] [toDate=dd-MM-yyyy] [traineeName=<name>]");
         }
 
         String trainerUsername = parts[2];
-        Date fromDate = null;
-        Date toDate = null;
+        LocalDateTime fromDate = null;
+        LocalDateTime toDate = null;
         String traineeName = null;
 
         for (int i = 3; i < parts.length; i++) {
             String token = parts[i];
             if (token.startsWith("fromDate=")) {
                 try {
-                    fromDate = dateFormat.parse(token.substring("fromDate=".length()));
+                    fromDate = toLocalDateTime(dateFormat.parse(token.substring("fromDate=".length())));
                 } catch (Exception e) {
-                    throw new IllegalArgumentException("Invalid date format for fromDate. Use dd-MM-yyy");
+                    throw new IllegalArgumentException("Invalid date format for fromDate. Use dd-MM-yyyy");
                 }
             } else if (token.startsWith("toDate=")) {
                 try {
-                    toDate = dateFormat.parse(token.substring("toDate=".length()));
+                    toDate = toLocalDateTime(dateFormat.parse(token.substring("toDate=".length())));
                 } catch (Exception e) {
-                    throw new IllegalArgumentException("Invalid date format for toDate. Use dd-MM-yyy");
+                    throw new IllegalArgumentException("Invalid date format for toDate. Use dd-MM-yyyy");
                 }
             } else if (token.startsWith("traineeName=")) {
                 traineeName = token.substring("traineeName=".length());
@@ -360,20 +361,20 @@ public class AuthenticatedProfileConsoleCommandService {
     public TrainingEntity addTraining(String command) {
         String[] parts = command.split("\\s+");
         if (parts.length < 8) {
-            throw new IllegalArgumentException("training add <traineeUsername> <trainerUsername> <trainingTypeName> <trainingName> <dd-MM-yyy> <durationMinutes>");
+            throw new IllegalArgumentException("training add <traineeUsername> <trainerUsername> <trainingTypeName> <trainingName> <dd-MM-yyyy> <durationMinutes>");
         }
 
         String traineeUsername = parts[2];
         String trainerUsername = parts[3];
         String trainingTypeName = parts[4];
         String trainingName = parts[5];
-        Date trainingDate;
+        LocalDateTime trainingDate;
         long trainingDuration;
 
         try {
-            trainingDate = dateFormat.parse(parts[6]);
+            trainingDate = toLocalDateTime(dateFormat.parse(parts[6]));
         } catch (Exception e) {
-            throw new IllegalArgumentException("Invalid date format. Use dd-MM-yyy");
+            throw new IllegalArgumentException("Invalid date format. Use dd-MM-yyyy");
         }
 
         try {
@@ -452,19 +453,18 @@ public class AuthenticatedProfileConsoleCommandService {
         return rawValue;
     }
 
-    private Date parseOptionalDate(String rawValue, String fieldName) {
+    private LocalDateTime parseOptionalDate(String rawValue, String fieldName) {
         if (rawValue == null || rawValue.isBlank() || "null".equalsIgnoreCase(rawValue) || "-".equals(rawValue)) {
             return null;
         }
         try {
-            return dateFormat.parse(rawValue);
+            return toLocalDateTime(dateFormat.parse(rawValue));
         } catch (Exception e) {
-            throw new IllegalArgumentException("Invalid date format for " + fieldName + ". Use dd-MM-yyy");
+            throw new IllegalArgumentException("Invalid date format for " + fieldName + ". Use dd-MM-yyyy");
         }
     }
+
+    private LocalDateTime toLocalDateTime(java.util.Date date) {
+        return date.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
+    }
 }
-
-
-
-
-

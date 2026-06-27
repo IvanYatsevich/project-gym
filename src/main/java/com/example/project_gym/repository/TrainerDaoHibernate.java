@@ -14,7 +14,7 @@ import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import java.util.ArrayList;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -59,7 +59,7 @@ public class TrainerDaoHibernate implements TrainerDAO {
     }
 
     @Override
-    public List<TrainingEntity> getTrainings(String trainerUsername, Date fromDate, Date toDate, String traineeName) {
+    public List<TrainingEntity> getTrainings(String trainerUsername, LocalDateTime fromDate, LocalDateTime toDate, String traineeName) {
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
         CriteriaQuery<TrainingEntity> cq = cb.createQuery(TrainingEntity.class);
         Root<TrainingEntity> training = cq.from(TrainingEntity.class);

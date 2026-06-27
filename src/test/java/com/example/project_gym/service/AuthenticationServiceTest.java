@@ -7,6 +7,7 @@ import com.example.project_gym.domain.entity.UserType;
 import com.example.project_gym.model.request.LoginRequest;
 import com.example.project_gym.repository.idao.TraineeDAO;
 import com.example.project_gym.repository.idao.TrainerDAO;
+import com.example.project_gym.security.AuthorizationContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,14 +28,18 @@ class AuthenticationServiceTest {
     private TraineeDAO traineeDao;
     @Mock
     private TrainerDAO trainerDao;
-
+    @Mock
     private AuthenticationService service;
+    @Mock
+    private AuthorizationContext authorizationContext;
 
     @BeforeEach
     void setUp() {
         service = new AuthenticationService();
         ReflectionTestUtils.setField(service, "traineeDAO", traineeDao);
         ReflectionTestUtils.setField(service, "trainerDAO", trainerDao);
+        authorizationContext = new AuthorizationContext();
+        service.setAuthorizationContext(authorizationContext);
     }
 
     @Test
@@ -48,6 +53,9 @@ class AuthenticationServiceTest {
         UserType result = service.authenticate("john", "123");
 
         assertEquals(UserType.TRAINEE, result);
+        assertTrue(authorizationContext.isAuthenticated());
+        assertEquals("john", authorizationContext.getUsername());
+        assertEquals(UserType.TRAINEE, authorizationContext.getUserType());
     }
 
     @Test
@@ -62,6 +70,9 @@ class AuthenticationServiceTest {
         UserType result = service.authenticate(new LoginRequest("kate", "123"));
 
         assertEquals(UserType.TRAINER, result);
+        assertTrue(authorizationContext.isAuthenticated());
+        assertEquals("kate", authorizationContext.getUsername());
+        assertEquals(UserType.TRAINER, authorizationContext.getUserType());
     }
 
     @Test
@@ -69,7 +80,23 @@ class AuthenticationServiceTest {
         when(traineeDao.findByUsername("bad")).thenReturn(Optional.empty());
         when(trainerDao.findByUsername("bad")).thenReturn(Optional.empty());
 
+        authorizationContext.authenticate("old-user", UserType.TRAINEE);
+
         assertThrows(AuthenticationException.class, () -> service.authenticate("bad", "111"));
+        assertFalse(authorizationContext.isAuthenticated());
+        assertNull(authorizationContext.getUsername());
+        assertEquals(UserType.UNKNOWN, authorizationContext.getUserType());
+    }
+
+    @Test
+    void logout_shouldClearAuthorizationContext() {
+        authorizationContext.authenticate("john", UserType.TRAINEE);
+
+        service.logout();
+
+        assertFalse(authorizationContext.isAuthenticated());
+        assertNull(authorizationContext.getUsername());
+        assertEquals(UserType.UNKNOWN, authorizationContext.getUserType());
     }
 }
 

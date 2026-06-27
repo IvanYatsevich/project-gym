@@ -1,10 +1,10 @@
 package com.example.project_gym.model.request;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 
 public record UpdateTraineeRequest(Boolean isActive,
                                    String address,
-                                   Date dateOfBirth) {
+                                   LocalDateTime dateOfBirth) {
     public UpdateTraineeRequest(Boolean isActive, String address) {
         this(isActive, address, null);
     }

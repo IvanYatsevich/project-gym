@@ -1,11 +1,11 @@
 package com.example.project_gym.model.request;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 
 public record TraineeTrainingsFilterRequest(
     String traineeUsername,
-    Date fromDate,
-    Date toDate,
+    LocalDateTime fromDate,
+    LocalDateTime toDate,
     String trainerName,
     String trainingType
 ) {

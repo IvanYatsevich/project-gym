@@ -6,8 +6,10 @@ import org.springframework.stereotype.Component;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Arrays;
-import java.util.Date;
 
 @Component
 public class ProfileCreationParserService {
@@ -44,7 +46,7 @@ public class ProfileCreationParserService {
             throw new IllegalArgumentException("trainee create requires firstName and lastName.");
         }
 
-        Date dateOfBirth = null;
+        LocalDateTime dateOfBirth = null;
         String address = null;
 
         if (parts.length >= 5) {
@@ -62,12 +64,14 @@ public class ProfileCreationParserService {
         return new CreateTraineeRequest(firstName, lastName, dateOfBirth, address);
     }
 
-    private Date parseDate(String value) {
+    private LocalDateTime parseDate(String value) {
         SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyy");
         dateFormat.setLenient(false);
 
         try {
-            return dateFormat.parse(value);
+            return Instant.ofEpochMilli(dateFormat.parse(value).getTime())
+                    .atZone(ZoneId.systemDefault())
+                    .toLocalDateTime();
         } catch (ParseException e) {
             throw new IllegalArgumentException("Invalid date format. Use dd-MM-yyy.");
         }

@@ -14,8 +14,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.lang.reflect.Field;
+import java.time.LocalDateTime;
 import java.util.Collections;
-import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
@@ -61,7 +61,7 @@ class TrainerEntityDaoImplTest {
     @Mock
     private Path<String> userNamePath;
     @Mock
-    private Path<Date> trainingDatePath;
+    private Path<LocalDateTime> trainingDatePath;
     @Mock
     private Path<?> traineePath;
     @Mock
@@ -132,8 +132,8 @@ class TrainerEntityDaoImplTest {
     @SuppressWarnings("unchecked")
     void getTrainings_shouldReturnResults() {
         String trainerUsername = "trainer1";
-        Date fromDate = new Date(System.currentTimeMillis() - 86400000L);
-        Date toDate = new Date();
+        LocalDateTime fromDate = LocalDateTime.now().minusDays(1);
+        LocalDateTime toDate = LocalDateTime.now();
         String traineeName = "john";
         List<TrainingEntity> expected = List.of(mock(TrainingEntity.class), mock(TrainingEntity.class));
 

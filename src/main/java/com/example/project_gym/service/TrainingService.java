@@ -7,6 +7,7 @@ import com.example.project_gym.model.request.CreateTrainingRequest;
 import com.example.project_gym.repository.idao.TraineeDAO;
 import com.example.project_gym.repository.idao.TrainerDAO;
 import com.example.project_gym.repository.idao.TrainingDAO;
+import com.example.project_gym.security.AuthenticationGuard;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -27,9 +28,17 @@ public class TrainingService {
     @Autowired
     private TraineeDAO traineeDao;
 
+    private AuthenticationGuard authGuard;
+
+    @Autowired
+    public void setAuthenticationGuard(AuthenticationGuard authGuard) {
+        this.authGuard = authGuard;
+    }
+
 
     @Transactional
     public TrainingEntity create(CreateTrainingRequest dto) {
+        authGuard.requireAuthenticated();
         validateTrainingDtoInput(dto);
 
         TraineeEntity traineeEntity = traineeDao.findById(dto.traineeId())
@@ -51,12 +60,14 @@ public class TrainingService {
 
     @Transactional(readOnly = true)
     public TrainingEntity select(Long id) {
+        authGuard.requireAuthenticated();
         return trainingDao.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Training not found"));
     }
 
     @Transactional(readOnly = true)
     public List<TrainingEntity> getAll() {
+        authGuard.requireAuthenticated();
         return trainingDao.getAll();
     }
 

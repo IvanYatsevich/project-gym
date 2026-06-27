@@ -3,6 +3,7 @@ package com.example.project_gym.view;
 
 import com.example.project_gym.domain.entity.TraineeEntity;
 import com.example.project_gym.domain.entity.TrainerEntity;
+import com.example.project_gym.domain.entity.TrainingEntity;
 import com.example.project_gym.domain.entity.UserType;
 import com.example.project_gym.model.request.LoginRequest;
 import com.example.project_gym.service.AuthenticationService;
@@ -10,7 +11,9 @@ import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Component;
 
 import javax.naming.AuthenticationException;
+import java.util.List;
 import java.util.Locale;
+import java.util.stream.Collectors;
 
 
 @Component
@@ -58,12 +61,12 @@ public class ConsoleCommandHandler {
                 case "help" -> guestConsoleCommandService.showHelp() + "\nauthorize <username> <password> - Login with credentials";
                 case "authorize-usage" -> "Use: authorize <username> <password>";
                 case "authorize" -> authorize(trimmedInput);
-                case "trainerEntity-create" -> {
+                case "trainer-create" -> {
                     TrainerEntity trainerEntity = guestConsoleCommandService.createTrainer(trimmedInput);
                     yield "Trainer created: " + trainerEntity.getUser().getUserName() +
                             " password: " + trainerEntity.getUser().getPassword();
                 }
-                case "traineeEntity-create" -> {
+                case "trainee-create" -> {
                     TraineeEntity traineeEntity = guestConsoleCommandService.createTrainee(trimmedInput);
                     yield "Trainee created: " + traineeEntity.getUser().getUserName() +
                             " password: " + traineeEntity.getUser().getPassword();
@@ -81,32 +84,32 @@ public class ConsoleCommandHandler {
             return switch (commandKey) {
                 case "help" -> showAuthorizedHelp();
                 case "logout" -> logout();
-                case "trainerEntity-select" -> "Selected trainerEntity: " + authenticatedProfileConsoleCommandService.selectTrainer(trimmedInput).getUser().getUserName();
-                case "traineeEntity-select" -> "Selected traineeEntity: " + authenticatedProfileConsoleCommandService.selectTrainee(trimmedInput).getUser().getUserName();
-                case "traineeEntity-password-change" -> {
+                case "trainer-select" -> "Selected trainer: " + authenticatedProfileConsoleCommandService.selectTrainer(trimmedInput).getUser().getUserName();
+                case "trainee-select" -> "Selected trainee: " + authenticatedProfileConsoleCommandService.selectTrainee(trimmedInput).getUser().getUserName();
+                case "trainee-password-change" -> {
                     authenticatedProfileConsoleCommandService.changeTraineePassword(trimmedInput);
                     yield "Trainee password changed.";
                 }
-                case "trainerEntity-password-change" -> {
+                case "trainer-password-change" -> {
                     authenticatedProfileConsoleCommandService.changeTrainerPassword(trimmedInput);
                     yield "Trainer password changed.";
                 }
-                case "trainerEntity-update" -> "Updated trainerEntity: " + authenticatedProfileConsoleCommandService.updateTrainer(trimmedInput).getId();
-                case "traineeEntity-update" -> "Updated traineeEntity: " + authenticatedProfileConsoleCommandService.updateTrainee(trimmedInput).getId();
-                case "traineeEntity-activate" -> "Activated traineeEntity: " + authenticatedProfileConsoleCommandService.activateTrainee(trimmedInput).getUser().getUserName();
-                case "traineeEntity-deactivate" -> "Deactivated traineeEntity: " + authenticatedProfileConsoleCommandService.deactivateTrainee(trimmedInput).getUser().getUserName();
-                case "trainerEntity-activate" -> "Activated trainerEntity: " + authenticatedProfileConsoleCommandService.activateTrainer(trimmedInput).getUser().getUserName();
-                case "trainerEntity-deactivate" -> "Deactivated trainerEntity: " + authenticatedProfileConsoleCommandService.deactivateTrainer(trimmedInput).getUser().getUserName();
-                case "traineeEntity-delete" -> authenticatedProfileConsoleCommandService.deleteTrainee(trimmedInput)
+                case "trainer-update" -> "Updated trainer: " + authenticatedProfileConsoleCommandService.updateTrainer(trimmedInput).getId();
+                case "trainee-update" -> "Updated trainee: " + authenticatedProfileConsoleCommandService.updateTrainee(trimmedInput).getId();
+                case "trainee-activate" -> "Activated trainee: " + authenticatedProfileConsoleCommandService.activateTrainee(trimmedInput).getUser().getUserName();
+                case "trainee-deactivate" -> "Deactivated trainee: " + authenticatedProfileConsoleCommandService.deactivateTrainee(trimmedInput).getUser().getUserName();
+                case "trainer-activate" -> "Activated trainer: " + authenticatedProfileConsoleCommandService.activateTrainer(trimmedInput).getUser().getUserName();
+                case "trainer-deactivate" -> "Deactivated trainer: " + authenticatedProfileConsoleCommandService.deactivateTrainer(trimmedInput).getUser().getUserName();
+                case "trainee-delete" -> authenticatedProfileConsoleCommandService.deleteTrainee(trimmedInput)
                         ? "Trainee deleted."
                         : "Trainee not found.";
-                case "traineeEntity-trainingEntities" -> "Trainee trainingEntities: " + authenticatedProfileConsoleCommandService.getTraineeTrainings(trimmedInput).size();
-                case "trainerEntity-trainingEntities" -> "Trainer trainingEntities: " + authenticatedProfileConsoleCommandService.getTrainerTrainings(trimmedInput).size();
-                case "trainingEntity-add" -> "Created trainingEntity: " + authenticatedProfileConsoleCommandService.addTraining(trimmedInput).getId();
-                case "traineeEntity-unassigned-trainerEntities" -> "Unassigned trainerEntities: " + authenticatedProfileConsoleCommandService.getUnassignedTrainers(trimmedInput).size();
-                case "traineeEntity-trainerEntities-update" -> {
+                case "trainee-trainings" -> formatTraineeTrainings(trimmedInput);
+                case "trainer-trainings" -> formatTrainerTrainings(trimmedInput);
+                case "training-add" -> "Created training: " + authenticatedProfileConsoleCommandService.addTraining(trimmedInput).getId();
+                case "trainee-unassigned-trainers" -> formatUnassignedTrainers(trimmedInput);
+                case "trainee-trainers-update" -> {
                     authenticatedProfileConsoleCommandService.updateTraineesTrainers(trimmedInput);
-                    yield "Trainee trainerEntities list updated.";
+                    yield "Trainee trainer list updated.";
                 }
                 default -> "Unknown authorized command. Type 'help'.";
             };
@@ -126,10 +129,10 @@ public class ConsoleCommandHandler {
             return "authorize";
         }
         if (guestConsoleCommandService.isTrainerCreateCommand(command)) {
-            return "trainerEntity-create";
+            return "trainer-create";
         }
         if (guestConsoleCommandService.isTraineeCreateCommand(command)) {
-            return "traineeEntity-create";
+            return "trainee-create";
         }
         return "unknown";
     }
@@ -142,58 +145,59 @@ public class ConsoleCommandHandler {
             return "logout";
         }
         if (authenticatedProfileConsoleCommandService.isSelectTrainerCommand(command)) {
-            return "trainerEntity-select";
+            return "trainer-select";
         }
         if (authenticatedProfileConsoleCommandService.isSelectTraineeCommand(command)) {
-            return "traineeEntity-select";
+            return "trainee-select";
         }
         if (authenticatedProfileConsoleCommandService.isTraineePasswordChangeCommand(command)) {
-            return "traineeEntity-password-change";
+            return "trainee-password-change";
         }
         if (authenticatedProfileConsoleCommandService.isTrainerPasswordChangeCommand(command)) {
-            return "trainerEntity-password-change";
+            return "trainer-password-change";
         }
         if (authenticatedProfileConsoleCommandService.isUpdateTrainerCommand(command)) {
-            return "trainerEntity-update";
+            return "trainer-update";
         }
         if (authenticatedProfileConsoleCommandService.isUpdateTraineeCommand(command)) {
-            return "traineeEntity-update";
+            return "trainee-update";
         }
         if (authenticatedProfileConsoleCommandService.isActivateTraineeCommand(command)) {
-            return "traineeEntity-activate";
+            return "trainee-activate";
         }
         if (authenticatedProfileConsoleCommandService.isDeactivateTraineeCommand(command)) {
-            return "traineeEntity-deactivate";
+            return "trainee-deactivate";
         }
         if (authenticatedProfileConsoleCommandService.isActivateTrainerCommand(command)) {
-            return "trainerEntity-activate";
+            return "trainer-activate";
         }
         if (authenticatedProfileConsoleCommandService.isDeactivateTrainerCommand(command)) {
-            return "trainerEntity-deactivate";
+            return "trainer-deactivate";
         }
         if (authenticatedProfileConsoleCommandService.isDeleteTraineeCommand(command)) {
-            return "traineeEntity-delete";
+            return "trainee-delete";
         }
         if (authenticatedProfileConsoleCommandService.isGetTraineeTrainingsCommand(command)) {
-            return "traineeEntity-trainingEntities";
+            return "trainee-trainings";
         }
         if (authenticatedProfileConsoleCommandService.isGetTrainerTrainingsCommand(command)) {
-            return "trainerEntity-trainingEntities";
+            return "trainer-trainings";
         }
         if (authenticatedProfileConsoleCommandService.isAddTrainingCommand(command)) {
-            return "trainingEntity-add";
+            return "training-add";
         }
         if (authenticatedProfileConsoleCommandService.isGetUnassignedTrainersCommand(command)) {
-            return "traineeEntity-unassigned-trainerEntities";
+            return "trainee-unassigned-trainers";
         }
         if (authenticatedProfileConsoleCommandService.isUpdateTraineesTrainersCommand(command)) {
-            return "traineeEntity-trainerEntities-update";
+            return "trainee-trainers-update";
         }
         return "unknown";
     }
 
     private String logout() {
         UserType previousType = currentUserType;
+        authenticationService.logout();
         authorizedUsername = null;
         currentUserType = UserType.UNKNOWN;
         return "Logged out from " + previousType + " profile.";
@@ -219,23 +223,65 @@ public class ConsoleCommandHandler {
         return currentUserType == UserType.TRAINER || currentUserType == UserType.TRAINEE;
     }
 
+    private String formatTraineeTrainings(String command) {
+        return formatTrainings(
+                "Trainee trainings",
+                authenticatedProfileConsoleCommandService.getTraineeTrainings(command)
+        );
+    }
+
+    private String formatTrainerTrainings(String command) {
+        return formatTrainings(
+                "Trainer trainings",
+                authenticatedProfileConsoleCommandService.getTrainerTrainings(command)
+        );
+    }
+
+    private String formatUnassignedTrainers(String command) {
+        List<TrainerEntity> trainers = authenticatedProfileConsoleCommandService.getUnassignedTrainers(command);
+        if (trainers.isEmpty()) {
+            return "Unassigned trainers: none";
+        }
+
+        String formatted = trainers.stream()
+                .map(trainer -> trainer.getUser().getFirstName() + " "
+                        + trainer.getUser().getLastName() + " (" + trainer.getUser().getUserName() + ")")
+                .collect(Collectors.joining(", "));
+        return "Unassigned trainers: " + formatted;
+    }
+
+    private String formatTrainings(String label, List<TrainingEntity> trainings) {
+        if (trainings.isEmpty()) {
+            return label + ": none";
+        }
+
+        String formatted = trainings.stream()
+                .map(training -> training.getTrainingName()
+                        + " [trainer=" + training.getTrainerEntity().getUser().getUserName()
+                        + ", trainee=" + training.getTraineeEntity().getUser().getUserName()
+                        + ", date=" + training.getTrainingDate()
+                        + ", duration=" + training.getTrainingDuration() + " min]")
+                .collect(Collectors.joining("; "));
+        return label + ": " + formatted;
+    }
+
     private String showAuthorizedHelp() {
         return """
                 Authorized commands:
-                trainerEntity select <username>
-                traineeEntity select <username>
-                traineeEntity password-change <username> <oldPassword> <newPassword>
-                trainerEntity password-change <username> <oldPassword> <newPassword>
-                trainerEntity update <username> [specialization=<type>] [active=true|false]
-                traineeEntity update <username> [address=<value>] [active=true|false] [dateOfBirth=dd-MM-yyy]
-                traineeEntity activate <username> | traineeEntity deactivate <username>
-                trainerEntity activate <username> | trainerEntity deactivate <username>
-                traineeEntity delete <username>
-                traineeEntity trainingEntities <username> [fromDate=dd-MM-yyy] [toDate=dd-MM-yyy] [trainerName=<name>] [trainingType=<type>]
-                trainerEntity trainingEntities <username> [fromDate=dd-MM-yyy] [toDate=dd-MM-yyy] [traineeName=<name>]
-                trainingEntity add <traineeUsername> <trainerUsername> <trainingTypeName> <trainingName> <dd-MM-yyy> <durationMinutes>
-                traineeEntity unassigned-trainerEntities <username>
-                traineeEntity trainerEntities-update <username> <trainerUsername1,trainerUsername2,...>
+                trainer select <username>
+                trainee select <username>
+                trainee password-change <username> <oldPassword> <newPassword>
+                trainer password-change <username> <oldPassword> <newPassword>
+                trainer update <username> [specialization=<type>] [active=true|false]
+                trainee update <username> [address=<value>] [active=true|false] [dateOfBirth=dd-MM-yyyy]
+                trainee activate <username> | trainee deactivate <username>
+                trainer activate <username> | trainer deactivate <username>
+                trainee delete <username>
+                trainee trainings <username> [fromDate=dd-MM-yyyy] [toDate=dd-MM-yyyy] [trainerName=<name>] [trainingType=<type>]
+                trainer trainings <username> [fromDate=dd-MM-yyyy] [toDate=dd-MM-yyyy] [traineeName=<name>]
+                training add <traineeUsername> <trainerUsername> <trainingTypeName> <trainingName> <dd-MM-yyyy> <durationMinutes>
+                trainee unassigned-trainers <username>
+                trainee trainers-update <username> <trainerUsername1,trainerUsername2,...>
                 logout
                 exit
                 """;

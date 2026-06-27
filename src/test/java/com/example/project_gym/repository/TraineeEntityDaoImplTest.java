@@ -18,8 +18,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.LocalDateTime;
 import java.util.Collections;
-import java.util.Date;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -72,7 +72,7 @@ class TraineeEntityDaoImplTest {
     @Mock
     private Path<String> userNamePath;
     @Mock
-    private Path<Date> trainingDatePath;
+    private Path<LocalDateTime> trainingDatePath;
     @Mock
     private Path<?> trainerPath;
     @Mock
@@ -149,8 +149,8 @@ class TraineeEntityDaoImplTest {
     @Test
     void getTrainings_shouldReturnResults() {
         String traineeUsername = "hulk";
-        Date fromDate = new Date(System.currentTimeMillis() - 86400000L);
-        Date toDate = new Date();
+        LocalDateTime fromDate = LocalDateTime.now().minusDays(1);
+        LocalDateTime toDate = LocalDateTime.now();
         String trainerName = "john";
         String trainingType = "Cardio";
 

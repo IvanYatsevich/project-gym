@@ -5,9 +5,11 @@ import com.example.project_gym.domain.entity.TrainerEntity;
 import com.example.project_gym.domain.entity.TrainingEntity;
 import com.example.project_gym.domain.entity.User;
 import com.example.project_gym.model.request.CreateTraineeRequest;
+import com.example.project_gym.model.request.PasswordChangeRequest;
 import com.example.project_gym.model.request.TraineeTrainingsFilterRequest;
 import com.example.project_gym.model.request.UpdateTraineeRequest;
 import com.example.project_gym.repository.idao.TraineeDAO;
+import com.example.project_gym.security.AuthenticationGuard;
 import com.example.project_gym.utilservices.authenticatedservices.PasswordChangeService;
 import com.example.project_gym.utilservices.guestservices.password.PasswordGenerator;
 import com.example.project_gym.utilservices.guestservices.username.UniqueUserNameGenerator;
@@ -19,13 +21,15 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -39,6 +43,8 @@ class TraineeEntityServiceTest {
     private UniqueUserNameGenerator userNameGenerator;
     @Mock
     private PasswordGenerator passwordGenerator;
+    @Mock
+    private AuthenticationGuard authGuard;
 
     private TraineeService traineeService;
 
@@ -49,11 +55,12 @@ class TraineeEntityServiceTest {
         ReflectionTestUtils.setField(traineeService, "passwordChangeService", passwordChangeService);
         traineeService.setUserNameGenerator(userNameGenerator);
         traineeService.setPasswordGenerator(passwordGenerator);
+        traineeService.setAuthenticationGuard(authGuard);
     }
 
     @Test
     void create_shouldCreateTrainee() {
-        Date dob = new Date();
+        LocalDateTime dob = LocalDateTime.now();
         when(userNameGenerator.generateUnique("Hulk", "Hogan")).thenReturn("Hulk.Hogan");
         when(passwordGenerator.generatePassword()).thenReturn("Pass12345");
 
@@ -64,6 +71,7 @@ class TraineeEntityServiceTest {
         assertEquals("NY", traineeEntity.getAddress());
         assertEquals(dob, traineeEntity.getDateOfBirth());
         verify(traineeDao).create(any(TraineeEntity.class));
+        verifyNoInteractions(authGuard);
     }
 
     @Test
@@ -100,7 +108,7 @@ class TraineeEntityServiceTest {
 
     @Test
     void getTrainings_shouldDelegateToDao() {
-        Date now = new Date();
+        LocalDateTime now = LocalDateTime.now();
         List<TrainingEntity> trainingEntities = List.of(new TrainingEntity());
         when(traineeDao.getTrainings("hulk", now, now, "ivan", "CARDIO")).thenReturn(trainingEntities);
 
@@ -149,5 +157,23 @@ class TraineeEntityServiceTest {
         when(traineeDao.deleteByUsername("hulk")).thenReturn(true);
 
         assertTrue(traineeService.deleteByUsername("hulk"));
+    }
+
+    @Test
+    void guardedOperations_shouldThrowWhenUnauthenticated() {
+        doThrow(new SecurityException("Authentication required")).when(authGuard).requireAuthenticated();
+
+        assertAll(
+                () -> assertThrows(SecurityException.class, () -> traineeService.selectByUsername("hulk")),
+                () -> assertThrows(SecurityException.class, () -> traineeService.changePassword(new PasswordChangeRequest("hulk", "old", "new"))),
+                () -> assertThrows(SecurityException.class, () -> traineeService.update(1L, new UpdateTraineeRequest(true, "LA"))),
+                () -> assertThrows(SecurityException.class, () -> traineeService.toggleActive("hulk")),
+                () -> assertThrows(SecurityException.class, () -> traineeService.deleteByUsername("hulk")),
+                () -> assertThrows(SecurityException.class, () -> traineeService.getTrainings(new TraineeTrainingsFilterRequest("hulk", null, null, null, null))),
+                () -> assertThrows(SecurityException.class, () -> traineeService.getUnassignedTrainers("hulk")),
+                () -> assertThrows(SecurityException.class, () -> traineeService.updateTrainersList("hulk", List.of(new TrainerEntity()))),
+                () -> assertThrows(SecurityException.class, () -> traineeService.select(1L)),
+                () -> assertThrows(SecurityException.class, () -> traineeService.delete(1L))
+        );
     }
 }

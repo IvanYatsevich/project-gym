@@ -3,7 +3,7 @@ package com.example.project_gym.domain.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -20,8 +20,7 @@ public class TraineeEntity {
     private Long id;
 
     @Column(name = "date_of_birth")
-    @Temporal(TemporalType.DATE)
-    private Date dateOfBirth;
+    private LocalDateTime dateOfBirth;
 
     @Column
     private String address;
