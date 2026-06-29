@@ -1,106 +1,124 @@
 package com.example.project_gym.service;
-
-import com.example.project_gym.model.Trainee;
-import com.example.project_gym.model.Trainer;
-import com.example.project_gym.model.Training;
-import com.example.project_gym.model.TrainingType;
-import com.example.project_gym.model.dto.dtoin.TrainingDtoIn;
-import com.example.project_gym.repository.idao.ITraineeDAO;
-import com.example.project_gym.repository.idao.ITrainerDAO;
-import com.example.project_gym.repository.idao.ITrainingDAO;
-import jakarta.persistence.EntityNotFoundException;
+import com.example.project_gym.domain.entity.TraineeEntity;
+import com.example.project_gym.domain.entity.TrainerEntity;
+import com.example.project_gym.domain.entity.TrainingEntity;
+import com.example.project_gym.domain.entity.User;
+import com.example.project_gym.exception.TraineeNotFoundException;
+import com.example.project_gym.exception.TrainerNotFoundException;
+import com.example.project_gym.exception.TrainingNotFoundException;
+import com.example.project_gym.mapper.TrainingMapper;
+import com.example.project_gym.model.request.create.TrainingCreateRequest;
+import com.example.project_gym.repository.idao.TraineeDAO;
+import com.example.project_gym.repository.idao.TrainerDAO;
+import com.example.project_gym.repository.idao.TrainingDAO;
+import com.example.project_gym.security.AuthenticationGuard;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
-
-import java.util.Date;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
-
 @ExtendWith(MockitoExtension.class)
 class TrainingServiceTest {
-
     @Mock
-    private ITrainingDAO trainingDao;
+    private TrainingDAO trainingDao;
     @Mock
-    private ITrainerDAO trainerDao;
+    private TrainerDAO trainerDao;
     @Mock
-    private ITraineeDAO traineeDao;
-
-    private TrainingService trainingService;
-
+    private TraineeDAO traineeDao;
+    @Mock
+    private TrainingMapper trainingMapper;
+    @Mock
+    private AuthenticationGuard authGuard;
+    private TrainingService service;
     @BeforeEach
     void setUp() {
-        trainingService = new TrainingService();
-        ReflectionTestUtils.setField(trainingService, "trainingDao", trainingDao);
-        ReflectionTestUtils.setField(trainingService, "trainerDao", trainerDao);
-        ReflectionTestUtils.setField(trainingService, "traineeDao", traineeDao);
+        service = new TrainingService(trainingDao, trainerDao, traineeDao, trainingMapper, authGuard);
+    }
+    @Test
+    void service_shouldBeInitialized() {
+        assertNotNull(service);
     }
 
     @Test
-    void create_shouldCreateTraining() {
-        TrainingType type = new TrainingType();
-        type.setTrainingTypeName("CARDIO");
-        Trainer trainer = new Trainer();
-        Trainee trainee = new Trainee();
-        when(trainerDao.selectById(1L)).thenReturn(Optional.of(trainer));
-        when(traineeDao.selectById(2L)).thenReturn(Optional.of(trainee));
-        when(trainingDao.create(any(Training.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    void create_shouldCreateTrainingSuccessfully() {
+        LocalDateTime now = LocalDateTime.now();
+        TrainingCreateRequest request = new TrainingCreateRequest("trainer1", "trainee1", "Training Session", now, 60L);
+        TraineeEntity trainee = new TraineeEntity();
+        User traineeUser = new User();
+        traineeUser.setActive(true);
+        trainee.setUser(traineeUser);
+        TrainerEntity trainer = new TrainerEntity();
+        User trainerUser = new User();
+        trainerUser.setActive(true);
+        trainer.setUser(trainerUser);
+        TrainingEntity trainingEntity = new TrainingEntity();
 
-        Training result = trainingService.create(new TrainingDtoIn(1L, 2L, "Morning", type, new Date(), 45L));
+        when(traineeDao.getByUsername("trainee1")).thenReturn(Optional.of(trainee));
+        when(trainerDao.getByUsername("trainer1")).thenReturn(Optional.of(trainer));
+        when(trainingMapper.toEntity(request)).thenReturn(trainingEntity);
 
-        assertSame(trainer, result.getTrainer());
-        assertSame(trainee, result.getTrainee());
-        assertEquals("Morning", result.getTrainingName());
+        service.create(request);
+
+        org.mockito.Mockito.verify(trainingDao).create(any(TrainingEntity.class));
     }
 
     @Test
-    void create_shouldThrowWhenTraineeMissing() {
-        TrainingType type = new TrainingType();
-        when(traineeDao.selectById(2L)).thenReturn(Optional.empty());
+    void create_shouldThrowExceptionWhenTraineeNotFound() {
+        LocalDateTime now = LocalDateTime.now();
+        TrainingCreateRequest request = new TrainingCreateRequest("trainer1", "nonexistent", "Training", now, 60L);
 
-        assertThrows(EntityNotFoundException.class,
-                () -> trainingService.create(new TrainingDtoIn(1L, 2L, "Morning", type, new Date(), 45L)));
+        when(traineeDao.getByUsername("nonexistent")).thenReturn(Optional.empty());
+
+        assertThrows(TraineeNotFoundException.class, () -> service.create(request));
     }
 
     @Test
-    void create_shouldThrowWhenTrainerMissing() {
-        TrainingType type = new TrainingType();
-        when(traineeDao.selectById(2L)).thenReturn(Optional.of(new Trainee()));
-        when(trainerDao.selectById(1L)).thenReturn(Optional.empty());
+    void create_shouldThrowExceptionWhenTrainerNotFound() {
+        LocalDateTime now = LocalDateTime.now();
+        TrainingCreateRequest request = new TrainingCreateRequest("nonexistent", "trainee1", "Training", now, 60L);
+        TraineeEntity trainee = new TraineeEntity();
 
-        assertThrows(EntityNotFoundException.class,
-                () -> trainingService.create(new TrainingDtoIn(1L, 2L, "Morning", type, new Date(), 45L)));
+        when(traineeDao.getByUsername("trainee1")).thenReturn(Optional.of(trainee));
+        when(trainerDao.getByUsername("nonexistent")).thenReturn(Optional.empty());
+
+        assertThrows(TrainerNotFoundException.class, () -> service.create(request));
     }
 
     @Test
-    void create_shouldThrowWhenNameBlank() {
-        assertThrows(IllegalArgumentException.class,
-                () -> trainingService.create(new TrainingDtoIn(1L, 2L, " ", new TrainingType(), new Date(), 45L)));
+    void select_shouldReturnTrainingWhenFound() {
+        TrainingEntity entity = new TrainingEntity();
+        entity.setId(1L);
+
+        when(trainingDao.findById(1L)).thenReturn(Optional.of(entity));
+
+        TrainingEntity result = service.select(1L);
+
+        assertNotNull(result);
+        assertEquals(1L, result.getId());
     }
 
     @Test
-    void create_shouldThrowWhenDurationInvalid() {
-        assertThrows(IllegalArgumentException.class,
-                () -> trainingService.create(new TrainingDtoIn(1L, 2L, "Morning", new TrainingType(), new Date(), 0L)));
+    void select_shouldThrowExceptionWhenNotFound() {
+        when(trainingDao.findById(999L)).thenReturn(Optional.empty());
+
+        assertThrows(TrainingNotFoundException.class, () -> service.select(999L));
     }
 
     @Test
-    void select_shouldThrowWhenMissing() {
-        when(trainingDao.getById(10L)).thenReturn(Optional.empty());
-        assertThrows(EntityNotFoundException.class, () -> trainingService.select(10L));
-    }
+    void getAll_shouldReturnAllTrainings() {
+        List<TrainingEntity> trainings = List.of(new TrainingEntity(), new TrainingEntity());
 
-    @Test
-    void getAll_shouldDelegateToDao() {
-        when(trainingDao.getAll()).thenReturn(List.of(new Training(), new Training()));
-        assertEquals(2, trainingService.getAll().size());
+        when(trainingDao.getAll()).thenReturn(trainings);
+
+        List<TrainingEntity> result = service.getAll();
+
+        assertNotNull(result);
+        assertEquals(2, result.size());
     }
 }

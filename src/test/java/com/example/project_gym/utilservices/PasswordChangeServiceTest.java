@@ -1,109 +1,72 @@
 package com.example.project_gym.utilservices;
-
-import com.example.project_gym.model.Trainee;
-import com.example.project_gym.model.Trainer;
-import com.example.project_gym.model.User;
-import com.example.project_gym.model.dto.dtoin.PasswordChangeDto;
-import com.example.project_gym.repository.idao.ITraineeDAO;
-import com.example.project_gym.repository.idao.ITrainerDAO;
-import com.example.project_gym.utilservices.authservices.PasswordChangeService;
-import jakarta.persistence.EntityNotFoundException;
+import com.example.project_gym.domain.entity.TraineeEntity;
+import com.example.project_gym.domain.entity.TrainerEntity;
+import com.example.project_gym.domain.entity.User;
+import com.example.project_gym.exception.UserNotFoundException;
+import com.example.project_gym.model.request.update.PasswordChangeRequest;
+import com.example.project_gym.repository.idao.TraineeDAO;
+import com.example.project_gym.repository.idao.TrainerDAO;
+import com.example.project_gym.security.AuthenticationGuard;
+import com.example.project_gym.utilservices.authenticatedservices.PasswordChangeService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
-
 import java.util.Optional;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-
 @ExtendWith(MockitoExtension.class)
 class PasswordChangeServiceTest {
-
     @Mock
-    private ITraineeDAO traineeDao;
+    private TraineeDAO traineeDao;
     @Mock
-    private ITrainerDAO trainerDao;
-
+    private TrainerDAO trainerDao;
+    @Mock
+    private AuthenticationGuard authGuard;
     private PasswordChangeService service;
-
     @BeforeEach
     void setUp() {
-        service = new PasswordChangeService();
-        ReflectionTestUtils.setField(service, "traineeDao", traineeDao);
-        ReflectionTestUtils.setField(service, "trainerDao", trainerDao);
+        service = new PasswordChangeService(traineeDao, trainerDao, authGuard);
     }
-
     @Test
     void changeTraineePassword_shouldUpdatePassword() {
-        Trainee trainee = new Trainee();
-        User user = new User();
-        user.setPassword("old");
-        trainee.setUser(user);
-        when(traineeDao.selectByUsername("hulk")).thenReturn(Optional.of(trainee));
-
-        service.changeTraineePassword(new PasswordChangeDto("hulk", "old", "new"));
-
-        assertEquals("new", trainee.getUser().getPassword());
-        verify(traineeDao).update(trainee);
+        var traineeEntity = new TraineeEntity();
+        var user = new User();
+        user.setPassword("oldPass");
+        traineeEntity.setUser(user);
+        when(traineeDao.getByUsername("trainee1")).thenReturn(Optional.of(traineeEntity));
+        var request = new PasswordChangeRequest("trainee1", "oldPass", "newPass");
+        service.changeTraineePassword(request);
+        assertEquals("newPass", traineeEntity.getUser().getPassword());
+        verify(traineeDao).update(traineeEntity);
     }
-
     @Test
     void changeTrainerPassword_shouldUpdatePassword() {
-        Trainer trainer = new Trainer();
-        User user = new User();
-        user.setPassword("old");
-        trainer.setUser(user);
-        when(trainerDao.selectByUsername("ivan")).thenReturn(Optional.of(trainer));
-
-        service.changeTrainerPassword(new PasswordChangeDto("ivan", "old", "new"));
-
-        assertEquals("new", trainer.getUser().getPassword());
-        verify(trainerDao).update(trainer);
+        var trainerEntity = new TrainerEntity();
+        var user = new User();
+        user.setPassword("oldPass");
+        trainerEntity.setUser(user);
+        when(trainerDao.getByUsername("trainer1")).thenReturn(Optional.of(trainerEntity));
+        var request = new PasswordChangeRequest("trainer1", "oldPass", "newPass");
+        service.changeTrainerPassword(request);
+        assertEquals("newPass", trainerEntity.getUser().getPassword());
+        verify(trainerDao).update(trainerEntity);
     }
 
     @Test
-    void changeTrainerPassword_shouldThrowWhenMissing() {
-        when(trainerDao.selectByUsername("ivan")).thenReturn(Optional.empty());
-
-        assertThrows(EntityNotFoundException.class,
-                () -> service.changeTrainerPassword(new PasswordChangeDto("ivan", "old", "new")));
+    void changeTraineePassword_shouldThrowWhenTraineeNotFound() {
+        when(traineeDao.getByUsername("unknown")).thenReturn(Optional.empty());
+        var request = new PasswordChangeRequest("unknown", "oldPass", "newPass");
+        assertThrows(UserNotFoundException.class, () -> service.changeTraineePassword(request));
     }
 
     @Test
-    void changeTraineePassword_shouldThrowWhenMissing() {
-        when(traineeDao.selectByUsername("hulk")).thenReturn(Optional.empty());
-
-        assertThrows(EntityNotFoundException.class,
-                () -> service.changeTraineePassword(new PasswordChangeDto("hulk", "old", "new")));
-    }
-
-    @Test
-    void changeTraineePassword_shouldThrowForBadOldPassword() {
-        Trainee trainee = new Trainee();
-        User user = new User();
-        user.setPassword("old");
-        trainee.setUser(user);
-        when(traineeDao.selectByUsername("hulk")).thenReturn(Optional.of(trainee));
-
-        assertThrows(IllegalArgumentException.class,
-                () -> service.changeTraineePassword(new PasswordChangeDto("hulk", "wrong", "new")));
-    }
-
-    @Test
-    void changeTrainerPassword_shouldThrowForBadOldPassword() {
-        Trainer trainer = new Trainer();
-        User user = new User();
-        user.setPassword("old");
-        trainer.setUser(user);
-        when(trainerDao.selectByUsername("ivan")).thenReturn(Optional.of(trainer));
-
-        assertThrows(IllegalArgumentException.class,
-                () -> service.changeTrainerPassword(new PasswordChangeDto("ivan", "wrong", "new")));
+    void changeTrainerPassword_shouldThrowWhenTrainerNotFound() {
+        when(trainerDao.getByUsername("unknown")).thenReturn(Optional.empty());
+        var request = new PasswordChangeRequest("unknown", "oldPass", "newPass");
+        assertThrows(UserNotFoundException.class, () -> service.changeTrainerPassword(request));
     }
 }

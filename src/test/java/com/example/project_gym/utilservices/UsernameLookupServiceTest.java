@@ -1,58 +1,48 @@
 package com.example.project_gym.utilservices;
-
-import com.example.project_gym.model.Trainee;
-import com.example.project_gym.model.Trainer;
-import com.example.project_gym.repository.idao.ITraineeDAO;
-import com.example.project_gym.repository.idao.ITrainerDAO;
-import com.example.project_gym.utilservices.unauthservices.username.UsernameLookupService;
+import com.example.project_gym.domain.entity.TraineeEntity;
+import com.example.project_gym.domain.entity.TrainerEntity;
+import com.example.project_gym.repository.idao.TraineeDAO;
+import com.example.project_gym.repository.idao.TrainerDAO;
+import com.example.project_gym.utilservices.guestservices.username.UsernameLookupService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
 import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
-
 @ExtendWith(MockitoExtension.class)
 class UsernameLookupServiceTest {
-
     @Mock
-    private ITrainerDAO trainerDao;
+    private TrainerDAO trainerDao;
     @Mock
-    private ITraineeDAO traineeDao;
-
+    private TraineeDAO traineeDao;
     private UsernameLookupService service;
-
     @BeforeEach
     void setUp() {
         service = new UsernameLookupService();
         service.setTrainerDao(trainerDao);
         service.setTraineeDao(traineeDao);
     }
-
     @Test
-    void existsByUserName_shouldReturnTrueWhenTrainerExists() {
-        when(trainerDao.selectByUsername("ivan")).thenReturn(Optional.of(new Trainer()));
-
-        assertTrue(service.existsByUserName("ivan"));
+    void existsByUserName_shouldReturnTrue_whenTraineeExists() {
+        var traineeEntity = new TraineeEntity();
+        when(traineeDao.getByUsername("trainee1")).thenReturn(Optional.of(traineeEntity));
+        when(trainerDao.getByUsername("trainee1")).thenReturn(Optional.empty());
+        assertTrue(service.existsByUserName("trainee1"));
     }
-
     @Test
-    void existsByUserName_shouldReturnTrueWhenTraineeExists() {
-        when(trainerDao.selectByUsername("hulk")).thenReturn(Optional.empty());
-        when(traineeDao.selectByUsername("hulk")).thenReturn(Optional.of(new Trainee()));
-
-        assertTrue(service.existsByUserName("hulk"));
+    void existsByUserName_shouldReturnTrue_whenTrainerExists() {
+        var trainerEntity = new TrainerEntity();
+        when(trainerDao.getByUsername("trainer1")).thenReturn(Optional.of(trainerEntity));
+        assertTrue(service.existsByUserName("trainer1"));
     }
-
     @Test
-    void existsByUserName_shouldReturnFalseWhenNotFound() {
-        when(trainerDao.selectByUsername("none")).thenReturn(Optional.empty());
-        when(traineeDao.selectByUsername("none")).thenReturn(Optional.empty());
-
-        assertFalse(service.existsByUserName("none"));
+    void existsByUserName_shouldReturnFalse_whenUserDoesNotExist() {
+        when(traineeDao.getByUsername("unknown")).thenReturn(Optional.empty());
+        when(trainerDao.getByUsername("unknown")).thenReturn(Optional.empty());
+        assertFalse(service.existsByUserName("unknown"));
     }
 }

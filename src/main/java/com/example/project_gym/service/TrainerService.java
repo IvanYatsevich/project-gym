@@ -1,150 +1,156 @@
 package com.example.project_gym.service;
 
-import com.example.project_gym.model.Trainer;
-import com.example.project_gym.model.Training;
-import com.example.project_gym.model.TrainingType;
-import com.example.project_gym.model.dto.dtoin.PasswordChangeDto;
-import com.example.project_gym.model.dto.dtoin.TrainerDtoIn;
-import com.example.project_gym.model.dto.dtoin.TrainerTrainingsFilterDto;
-import com.example.project_gym.model.dto.dtoupdate.TrainerUpdateDto;
-import com.example.project_gym.repository.idao.ITrainerDAO;
-import com.example.project_gym.repository.idao.ITrainingTypeDAO;
-import com.example.project_gym.utilservices.authservices.PasswordChangeService;
-import com.example.project_gym.utilservices.unauthservices.password.PasswordGenerator;
-import com.example.project_gym.utilservices.unauthservices.username.UniqueUserNameGenerator;
-import jakarta.persistence.EntityNotFoundException;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.example.project_gym.domain.entity.*;
+import com.example.project_gym.exception.BusinessRuleException;
+import com.example.project_gym.exception.InactiveUserException;
+import com.example.project_gym.exception.TrainerNotFoundException;
+import com.example.project_gym.exception.TrainingTypeNotFoundException;
+import com.example.project_gym.mapper.TrainerMapper;
+import com.example.project_gym.mapper.TrainingMapper;
+import com.example.project_gym.model.request.create.TrainerCreateRequest;
+import com.example.project_gym.model.request.TrainerTrainingsRequest;
+import com.example.project_gym.model.request.get.TrainerRequest;
+import com.example.project_gym.model.request.update.TrainerUpdateRequest;
+import com.example.project_gym.model.request.update.UserActivationRequest;
+import com.example.project_gym.model.response.create.TrainerCreateResponse;
+import com.example.project_gym.model.response.get.SimpleTrainingResponse;
+import com.example.project_gym.model.response.get.TrainerResponse;
+import com.example.project_gym.model.response.update.TrainerUpdateResponse;
+import com.example.project_gym.repository.idao.TrainerDAO;
+import com.example.project_gym.repository.idao.TrainingTypeDAO;
+import com.example.project_gym.security.AuthenticationGuard;
+import com.example.project_gym.utilservices.authenticatedservices.PasswordChangeService;
+import com.example.project_gym.utilservices.guestservices.password.PasswordGenerator;
+import com.example.project_gym.utilservices.guestservices.username.UniqueUserNameGenerator;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
 @Service
-@Transactional
 public class TrainerService {
 
-    @Autowired
-    private ITrainerDAO trainerDao;
+    private TrainerDAO trainerDao;
 
-    @Autowired
-    private ITrainingTypeDAO trainingTypeDao;
+    private TrainingTypeDAO trainingTypeDao;
 
-    @Autowired
     private PasswordChangeService passwordChangeService;
 
     private UniqueUserNameGenerator nameGenerator;
+
     private PasswordGenerator passwordGenerator;
 
+    private AuthenticationGuard authGuard;
 
-    @Autowired
-    public void setUserNameGenerator(UniqueUserNameGenerator nameGenerator) {
+    private TrainerMapper trainerMapper;
+
+    private TrainingMapper trainingMapper;
+
+    public TrainerService(TrainerDAO trainerDao,
+                          TrainingTypeDAO trainingTypeDao,
+                          PasswordChangeService passwordChangeService,
+                          UniqueUserNameGenerator nameGenerator,
+                          PasswordGenerator passwordGenerator,
+                          AuthenticationGuard authGuard,
+                          TrainerMapper trainerMapper,
+                          TrainingMapper trainingMapper) {
+        this.trainerDao = trainerDao;
+        this.trainingTypeDao = trainingTypeDao;
+        this.passwordChangeService = passwordChangeService;
         this.nameGenerator = nameGenerator;
-    }
-
-    @Autowired
-    public void setPasswordGenerator(PasswordGenerator passwordGenerator) {
         this.passwordGenerator = passwordGenerator;
+        this.authGuard = authGuard;
+        this.trainerMapper = trainerMapper;
+        this.trainingMapper = trainingMapper;
     }
 
-    public Trainer create(TrainerDtoIn trainerDtoIn) {
-        validateTrainerDtoInput(trainerDtoIn);
 
-        TrainingType trainingType = resolveTrainingType(trainerDtoIn.specialization());
 
-        Trainer trainer = new Trainer();
-        trainer.setTrainingType(trainingType);
+    @Transactional
+    public TrainerCreateResponse create(TrainerCreateRequest trainerCreateRequest) {
 
-        com.example.project_gym.model.User user = new com.example.project_gym.model.User();
-        user.setFirstName(trainerDtoIn.firstName());
-        user.setLastName(trainerDtoIn.lastName());
-        user.setUserName(nameGenerator.generateUnique(trainerDtoIn.firstName(), trainerDtoIn.lastName()));
+        TrainingTypeEntity trainingTypeEntity = resolveTrainingType(trainerCreateRequest.specialization());
+
+
+        User user = new User();
+        TrainerEntity trainerEntity = trainerMapper.toEntity(trainerCreateRequest);
+        trainerEntity.setTrainingTypeEntity(trainingTypeEntity);
+        user.setFirstName(trainerCreateRequest.firstName());
+        user.setLastName(trainerCreateRequest.lastName());
+        user.setUserName(nameGenerator.generateUnique(trainerCreateRequest.firstName(), trainerCreateRequest.lastName()));
         user.setPassword(passwordGenerator.generatePassword());
         user.setActive(true);
-        
-        trainer.setUser(user);
-        trainerDao.create(trainer);
-        return trainer;
+        trainerEntity.setUser(user);
+
+        return trainerMapper.toCreateResponse(trainerDao.create(trainerEntity));
     }
 
     @Transactional(readOnly = true)
-    public Trainer selectByUsername(String username) {
-        return trainerDao.selectByUsername(username)
-                .orElseThrow(() -> new EntityNotFoundException("Trainer with username " + username + " not found"));
+    public TrainerResponse selectByUsername(TrainerRequest trainerRequest) {
+        authGuard.requireAuthenticated();
+        return trainerDao.getByUsername(trainerRequest.username())
+                .map(trainerMapper::toGetResponse)
+                .orElseThrow(() -> new TrainerNotFoundException("Trainer with username " + trainerRequest.username() + " not found"));
+    }
+
+
+    @Transactional
+    public TrainerUpdateResponse update(TrainerUpdateRequest updateTrainerRequest) {
+        authGuard.requireAuthenticated();
+
+        TrainerEntity existingTrainerEntity = trainerDao.getByUsername(updateTrainerRequest.username())
+                .orElseThrow(() -> new TrainerNotFoundException("Trainer not found"));
+
+        if (existingTrainerEntity.getUser().isActive() == updateTrainerRequest.isActive()) {
+            throw new InactiveUserException("Trainer activation status is already " + updateTrainerRequest.isActive());
+        }
+
+        trainerMapper.updateEntity(updateTrainerRequest, existingTrainerEntity);
+        existingTrainerEntity.getUser().setActive(updateTrainerRequest.isActive());
+        existingTrainerEntity.setTrainingTypeEntity(updateTrainerRequest.specialization());
+
+
+        return trainerMapper.toUpdateResponse(trainerDao.update(existingTrainerEntity));
+    }
+    @Transactional
+    public void toggleActive(UserActivationRequest request) {
+        authGuard.requireAuthenticated();
+        TrainerEntity trainerEntity = trainerDao.getByUsername(request.username())
+                .orElseThrow(() -> new TrainerNotFoundException("Trainer with username " + request.username() + " not found"));
+        if (trainerEntity.getUser().isActive() == request.isActive()) {
+            throw new InactiveUserException("Trainer activation status is already " + request.isActive());
+        }
+        trainerMapper.updateActiveStatus(request, trainerEntity);
+        trainerDao.update(trainerEntity);
     }
 
     @Transactional(readOnly = true)
-    public boolean authenticate(String username, String password) {
-        return trainerDao.selectByUsername(username)
-                .map(trainer -> trainer.getUser().getPassword().equals(password))
-                .orElseThrow(() -> new IllegalArgumentException("Username or password are invalid"));
+    public List<SimpleTrainingResponse> getTrainings(TrainerTrainingsRequest trainingsRequest) {
+        authGuard.requireAuthenticated();
+        List<TrainingEntity> trainings = trainerDao.getTrainings(
+                trainingsRequest.trainerUsername(),
+                trainingsRequest.fromDate(),
+                trainingsRequest.toDate(),
+                trainingsRequest.traineeName());
+        return trainings.stream()
+                .map(trainingMapper::toResponse)
+                .toList();
     }
 
-    public void changePassword(PasswordChangeDto passwordChangeDto) {
-        passwordChangeService.changeTrainerPassword(passwordChangeDto);
-    }
+//    @Transactional(readOnly = true)
+//    public TrainerEntity select(Long id) {
+//        authGuard.requireAuthenticated();
+//        return trainerDao.getById(id)
+//                .orElseThrow(() -> new EntityNotFoundException("Trainer not found"));
+//    }
 
-    public Trainer update(Long id, TrainerUpdateDto trainerUpdateDto) {
-        validateTrainerUpdateDto(trainerUpdateDto);
-        
-        Trainer existingTrainer = trainerDao.selectById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Trainer not found"));
 
-        existingTrainer.getUser().setActive(trainerUpdateDto.isActive());
-        existingTrainer.setTrainingType(resolveTrainingType(trainerUpdateDto.specialization()));
 
-        trainerDao.update(existingTrainer);
-        return existingTrainer;
-    }
-
-    public Trainer toggleActive(String username) {
-        Trainer trainer = selectByUsername(username);
-        trainer.getUser().setActive(!trainer.getUser().isActive());
-        trainerDao.update(trainer);
-        return trainer;
-    }
-
-    @Transactional(readOnly = true)
-    public List<Training> getTrainings(TrainerTrainingsFilterDto filterDto) {
-        return trainerDao.getTrainings(
-            filterDto.trainerUsername(),
-            filterDto.fromDate(),
-            filterDto.toDate(),
-            filterDto.traineeName()
-        );
-    }
-
-    @Transactional(readOnly = true)
-    public Trainer select(Long id) {
-        return trainerDao.selectById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Trainer not found"));
-    }
-
-    private void validateTrainerDtoInput(TrainerDtoIn trainerDtoIn) {
-        if (trainerDtoIn.firstName() == null || trainerDtoIn.firstName().trim().isEmpty()) {
-            throw new IllegalArgumentException("First name is required");
+    private TrainingTypeEntity resolveTrainingType(String trainingTypeName) {
+        if (trainingTypeName == null || trainingTypeName.isBlank()) {
+            throw new BusinessRuleException("Training type must be provided");
         }
-        if (trainerDtoIn.lastName() == null || trainerDtoIn.lastName().trim().isEmpty()) {
-            throw new IllegalArgumentException("Last name is required");
-        }
-        if (trainerDtoIn.specialization() == null || trainerDtoIn.specialization().trim().isEmpty()) {
-            throw new IllegalArgumentException("Specialization is required");
-        }
-    }
-
-    private void validateTrainerUpdateDto(TrainerUpdateDto trainerUpdateDto) {
-        if (trainerUpdateDto == null) {
-            throw new IllegalArgumentException("Trainer update data is required");
-        }
-        if (trainerUpdateDto.isActive() == null) {
-            throw new IllegalArgumentException("isActive is required");
-        }
-        if (trainerUpdateDto.specialization() == null || trainerUpdateDto.specialization().trim().isEmpty()) {
-            throw new IllegalArgumentException("Specialization is required");
-        }
-    }
-
-    private TrainingType resolveTrainingType(String trainingTypeName) {
         return trainingTypeDao.findByTrainingTypeName(trainingTypeName)
-                .orElseThrow(() -> new IllegalArgumentException("Training type not found: " + trainingTypeName));
+                .orElseThrow(() -> new TrainingTypeNotFoundException("Training type not found: " + trainingTypeName));
     }
 }

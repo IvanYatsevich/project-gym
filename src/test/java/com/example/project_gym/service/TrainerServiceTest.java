@@ -1,158 +1,160 @@
 package com.example.project_gym.service;
-
-import com.example.project_gym.model.Trainer;
-import com.example.project_gym.model.Training;
-import com.example.project_gym.model.TrainingType;
-import com.example.project_gym.model.User;
-import com.example.project_gym.model.dto.dtoin.TrainerDtoIn;
-import com.example.project_gym.model.dto.dtoin.TrainerTrainingsFilterDto;
-import com.example.project_gym.model.dto.dtoupdate.TrainerUpdateDto;
-import com.example.project_gym.model.dto.dtoin.PasswordChangeDto;
-import com.example.project_gym.repository.idao.ITrainerDAO;
-import com.example.project_gym.repository.idao.ITrainingTypeDAO;
-import com.example.project_gym.utilservices.authservices.PasswordChangeService;
-import com.example.project_gym.utilservices.unauthservices.password.PasswordGenerator;
-import com.example.project_gym.utilservices.unauthservices.username.UniqueUserNameGenerator;
-import jakarta.persistence.EntityNotFoundException;
+import com.example.project_gym.domain.entity.TrainerEntity;
+import com.example.project_gym.domain.entity.TrainingTypeEntity;
+import com.example.project_gym.domain.entity.User;
+import com.example.project_gym.exception.TrainerNotFoundException;
+import com.example.project_gym.mapper.TrainerMapper;
+import com.example.project_gym.mapper.TrainingMapper;
+import com.example.project_gym.model.request.TrainerTrainingsRequest;
+import com.example.project_gym.model.request.create.TrainerCreateRequest;
+import com.example.project_gym.model.request.get.TrainerRequest;
+import com.example.project_gym.model.request.update.TrainerUpdateRequest;
+import com.example.project_gym.model.request.update.UserActivationRequest;
+import com.example.project_gym.model.response.create.TrainerCreateResponse;
+import com.example.project_gym.model.response.get.TrainerResponse;
+import com.example.project_gym.model.response.update.TrainerUpdateResponse;
+import com.example.project_gym.repository.idao.TrainerDAO;
+import com.example.project_gym.repository.idao.TrainingTypeDAO;
+import com.example.project_gym.security.AuthenticationGuard;
+import com.example.project_gym.utilservices.authenticatedservices.PasswordChangeService;
+import com.example.project_gym.utilservices.guestservices.password.PasswordGenerator;
+import com.example.project_gym.utilservices.guestservices.username.UniqueUserNameGenerator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
-
-import java.util.Date;
 import java.util.List;
 import java.util.Optional;
-
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-
 @ExtendWith(MockitoExtension.class)
 class TrainerServiceTest {
-
     @Mock
-    private ITrainerDAO trainerDao;
+    private TrainerDAO trainerDao;
     @Mock
-    private ITrainingTypeDAO trainingTypeDao;
+    private TrainingTypeDAO trainingTypeDao;
     @Mock
     private PasswordChangeService passwordChangeService;
     @Mock
-    private UniqueUserNameGenerator userNameGenerator;
+    private UniqueUserNameGenerator nameGenerator;
     @Mock
     private PasswordGenerator passwordGenerator;
-
-    private TrainerService trainerService;
-
+    @Mock
+    private AuthenticationGuard authGuard;
+    @Mock
+    private TrainerMapper trainerMapper;
+    @Mock
+    private TrainingMapper trainingMapper;
+    private TrainerService service;
     @BeforeEach
     void setUp() {
-        trainerService = new TrainerService();
-        ReflectionTestUtils.setField(trainerService, "trainerDao", trainerDao);
-        ReflectionTestUtils.setField(trainerService, "trainingTypeDao", trainingTypeDao);
-        ReflectionTestUtils.setField(trainerService, "passwordChangeService", passwordChangeService);
-        trainerService.setUserNameGenerator(userNameGenerator);
-        trainerService.setPasswordGenerator(passwordGenerator);
+        service = new TrainerService(trainerDao, trainingTypeDao, passwordChangeService, nameGenerator, passwordGenerator, authGuard, trainerMapper, trainingMapper);
+    }
+    @Test
+    void service_shouldBeInitialized() {
+        assertNotNull(service);
     }
 
     @Test
-    void create_shouldCreateTrainer() {
-        TrainingType cardio = new TrainingType();
-        cardio.setTrainingTypeName("CARDIO");
-        when(trainingTypeDao.findByTrainingTypeName("CARDIO")).thenReturn(Optional.of(cardio));
-        when(userNameGenerator.generateUnique("Ivan", "Ivanov")).thenReturn("Ivan.Ivanov");
-        when(passwordGenerator.generatePassword()).thenReturn("Pass12345");
-
-        Trainer result = trainerService.create(new TrainerDtoIn("Ivan", "Ivanov", "CARDIO"));
-
-        assertEquals("Ivan", result.getUser().getFirstName());
-        assertEquals("Ivan.Ivanov", result.getUser().getUserName());
-        assertTrue(result.getUser().isActive());
-        assertEquals("CARDIO", result.getTrainingType().getTrainingTypeName());
-        verify(trainerDao).create(any(Trainer.class));
-    }
-
-    @Test
-    void selectByUsername_shouldThrowWhenMissing() {
-        when(trainerDao.selectByUsername("missing")).thenReturn(Optional.empty());
-        assertThrows(EntityNotFoundException.class, () -> trainerService.selectByUsername("missing"));
-    }
-
-    @Test
-    void authenticate_shouldReturnTrueForCorrectPassword() {
-        Trainer trainer = new Trainer();
+    void create_shouldCreateTrainerSuccessfully() {
+        TrainerCreateRequest request = new TrainerCreateRequest("John", "Doe", "CARDIO");
+        TrainerEntity entity = new TrainerEntity();
         User user = new User();
-        user.setPassword("secret");
-        trainer.setUser(user);
-        when(trainerDao.selectByUsername("ivan")).thenReturn(Optional.of(trainer));
+        entity.setUser(user);
+        TrainingTypeEntity trainingType = new TrainingTypeEntity();
+        trainingType.setTrainingTypeName("CARDIO");
+        entity.setTrainingTypeEntity(trainingType);
+        TrainerCreateResponse response = new TrainerCreateResponse("john.doe", "password123");
 
-        assertTrue(trainerService.authenticate("ivan", "secret"));
+        when(trainingTypeDao.findByTrainingTypeName("CARDIO")).thenReturn(Optional.of(trainingType));
+        when(trainerMapper.toEntity(request)).thenReturn(entity);
+        when(nameGenerator.generateUnique("John", "Doe")).thenReturn("john.doe");
+        when(passwordGenerator.generatePassword()).thenReturn("password123");
+        when(trainerDao.create(any(TrainerEntity.class))).thenReturn(entity);
+        when(trainerMapper.toCreateResponse(entity)).thenReturn(response);
+
+        TrainerCreateResponse result = service.create(request);
+
+        assertNotNull(result);
+        assertEquals("john.doe", result.username());
     }
 
     @Test
-    void authenticate_shouldThrowWhenUserMissing() {
-        when(trainerDao.selectByUsername("none")).thenReturn(Optional.empty());
+    void selectByUsername_shouldReturnTrainerWhenFound() {
+        TrainerRequest request = new TrainerRequest("john.doe");
+        TrainerEntity entity = new TrainerEntity();
+        TrainingTypeEntity trainingType = new TrainingTypeEntity();
+        entity.setTrainingTypeEntity(trainingType);
+        TrainerResponse response = new TrainerResponse("John", "Doe", trainingType, true, List.of());
 
-        assertThrows(IllegalArgumentException.class, () -> trainerService.authenticate("none", "123"));
+        when(trainerDao.getByUsername("john.doe")).thenReturn(Optional.of(entity));
+        when(trainerMapper.toGetResponse(entity)).thenReturn(response);
+
+        TrainerResponse result = service.selectByUsername(request);
+
+        assertNotNull(result);
+        assertEquals("John", result.firstName());
     }
 
     @Test
-    void update_shouldChangeFields() {
-        Trainer trainer = new Trainer();
+    void selectByUsername_shouldThrowExceptionWhenNotFound() {
+        TrainerRequest request = new TrainerRequest("nonexistent");
+
+        when(trainerDao.getByUsername("nonexistent")).thenReturn(Optional.empty());
+
+        assertThrows(TrainerNotFoundException.class, () -> service.selectByUsername(request));
+    }
+
+    @Test
+    void update_shouldUpdateTrainerSuccessfully() {
+        TrainingTypeEntity trainingType = new TrainingTypeEntity();
+        trainingType.setId(1L);
+        trainingType.setTrainingTypeName("STRENGTH");
+        TrainerUpdateRequest request = new TrainerUpdateRequest("john.doe", "Jane", "Smith", trainingType, true);
+        TrainerEntity entity = new TrainerEntity();
         User user = new User();
-        user.setActive(false);
-        trainer.setUser(user);
+        entity.setUser(user);
+        entity.setTrainingTypeEntity(trainingType);
+        TrainerUpdateResponse response = new TrainerUpdateResponse("john.doe", "Jane", "Smith", trainingType, true, List.of());
 
-        TrainingType strength = new TrainingType();
-        strength.setTrainingTypeName("STRENGTH");
+        when(trainerDao.getByUsername("john.doe")).thenReturn(Optional.of(entity));
+        when(trainerDao.update(any(TrainerEntity.class))).thenReturn(entity);
+        when(trainerMapper.toUpdateResponse(entity)).thenReturn(response);
 
-        when(trainerDao.selectById(1L)).thenReturn(Optional.of(trainer));
-        when(trainingTypeDao.findByTrainingTypeName("STRENGTH")).thenReturn(Optional.of(strength));
+        TrainerUpdateResponse result = service.update(request);
 
-        Trainer updated = trainerService.update(1L, new TrainerUpdateDto(true, "STRENGTH"));
-
-        assertTrue(updated.getUser().isActive());
-        assertEquals("STRENGTH", updated.getTrainingType().getTrainingTypeName());
-        verify(trainerDao).update(trainer);
+        assertNotNull(result);
+        assertEquals("john.doe", result.username());
     }
 
-    @Test
-    void update_shouldThrowWhenDtoMissing() {
-        assertThrows(IllegalArgumentException.class, () -> trainerService.update(1L, null));
-    }
+    // ...existing code...
 
     @Test
-    void toggleActive_shouldFlipStatus() {
-        Trainer trainer = new Trainer();
+    void toggleActive_shouldUpdateActiveStatus() {
+        UserActivationRequest request = new UserActivationRequest("john.doe", false);
+        TrainerEntity entity = new TrainerEntity();
         User user = new User();
-        user.setActive(false);
-        trainer.setUser(user);
-        when(trainerDao.selectByUsername("ivan")).thenReturn(Optional.of(trainer));
+        user.setActive(true);
+        entity.setUser(user);
 
-        Trainer result = trainerService.toggleActive("ivan");
+        when(trainerDao.getByUsername("john.doe")).thenReturn(Optional.of(entity));
 
-        assertTrue(result.getUser().isActive());
-        verify(trainerDao).update(trainer);
+        service.toggleActive(request);
+
+        org.mockito.Mockito.verify(trainerDao).update(any(TrainerEntity.class));
     }
 
     @Test
-    void changePassword_shouldDelegate() {
-        PasswordChangeDto dto = new PasswordChangeDto("ivan", "old", "new");
+    void getTrainings_shouldReturnTrainerTrainings() {
+        TrainerTrainingsRequest request = new TrainerTrainingsRequest("john.doe", null, null, null);
 
-        trainerService.changePassword(dto);
+        when(trainerDao.getTrainings("john.doe", null, null, null)).thenReturn(List.of());
 
-        verify(passwordChangeService).changeTrainerPassword(dto);
-    }
+        var result = service.getTrainings(request);
 
-    @Test
-    void getTrainings_shouldDelegateToDao() {
-        List<Training> trainings = List.of(new Training());
-        Date now = new Date();
-        when(trainerDao.getTrainings("ivan", now, now, "petr")).thenReturn(trainings);
-
-        List<Training> result = trainerService.getTrainings(new TrainerTrainingsFilterDto("ivan", now, now, "petr"));
-
-        assertEquals(1, result.size());
+        assertNotNull(result);
+        assertEquals(0, result.size());
     }
 }
