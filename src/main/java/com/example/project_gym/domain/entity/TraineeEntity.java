@@ -32,7 +32,7 @@ public class TraineeEntity {
     @ManyToMany(mappedBy = "traineeEntities")
     private Set<TrainerEntity> trainerEntities = new HashSet<>();
 
-    @OneToMany(mappedBy = "traineeEntity", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    @OneToMany(mappedBy = "traineeEntity", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<TrainingEntity> trainingEntities;
 }
 

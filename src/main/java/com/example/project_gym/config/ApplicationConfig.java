@@ -1,13 +1,11 @@
 package com.example.project_gym.config;
 
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.ComponentScan;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.PropertySource;
+import org.springframework.context.annotation.*;
 import org.springframework.context.support.PropertySourcesPlaceholderConfigurer;
 
 @Configuration
-@ComponentScan("com.example.project_gym")
+@ComponentScan(basePackages = "com.example.project_gym", excludeFilters = @ComponentScan.Filter(
+        type = FilterType.ASSIGNABLE_TYPE, classes = WebMvcConfig.class))
 @PropertySource("classpath:application.properties")
 public class ApplicationConfig {
 

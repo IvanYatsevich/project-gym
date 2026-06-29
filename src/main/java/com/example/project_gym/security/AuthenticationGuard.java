@@ -1,5 +1,6 @@
 package com.example.project_gym.security;
 
+import com.example.project_gym.exception.UnauthenticatedException;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -12,7 +13,7 @@ public class AuthenticationGuard {
 
     public void requireAuthenticated() {
         if (!authContext.isAuthenticated()) {
-            throw new SecurityException("Authentication required");
+            throw new UnauthenticatedException("Authentication required");
         }
     }
 }

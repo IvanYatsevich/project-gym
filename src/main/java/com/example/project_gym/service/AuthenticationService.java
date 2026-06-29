@@ -1,17 +1,14 @@
 package com.example.project_gym.service;
 
 import com.example.project_gym.domain.entity.UserType;
+import com.example.project_gym.exception.AuthenticationFailedException;
 import com.example.project_gym.model.request.LoginRequest;
 import com.example.project_gym.repository.idao.TraineeDAO;
 import com.example.project_gym.repository.idao.TrainerDAO;
 import com.example.project_gym.security.AuthorizationContext;
-import com.example.project_gym.utilservices.guestservices.username.UniqueUserNameGenerator;
-import lombok.Setter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import javax.naming.AuthenticationException;
 
 @Service
 @Transactional(readOnly = true)
@@ -32,18 +29,18 @@ public class AuthenticationService {
     }
 
     private boolean authenticateTrainee(String username, String password) {
-        return traineeDAO.findByUsername(username)
+        return traineeDAO.getByUsername(username)
                 .map(trainee -> trainee.getUser().getPassword().equals(password))
                 .orElse(false);
     }
 
     private boolean authenticateTrainer(String username, String password) {
-        return trainerDAO.findByUsername(username)
+        return trainerDAO.getByUsername(username)
                 .map(trainer -> trainer.getUser().getPassword().equals(password))
                 .orElse(false);
     }
 
-    public UserType authenticate(String username, String password) throws AuthenticationException {
+    public UserType authenticate(String username, String password) {
         if (authenticateTrainee(username, password)) {
             authorizationContext.authenticate(username, UserType.TRAINEE);
             return UserType.TRAINEE;
@@ -55,10 +52,10 @@ public class AuthenticationService {
         }
 
         authorizationContext.clear();
-        throw new AuthenticationException("Username or password are invalid");
+        throw new AuthenticationFailedException("Username or password are invalid");
     }
 
-    public UserType authenticate(LoginRequest loginRequest) throws AuthenticationException {
+    public UserType authenticate(LoginRequest loginRequest) {
         return authenticate(loginRequest.username(), loginRequest.password());
     }
 

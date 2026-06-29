@@ -2,11 +2,13 @@ package com.example.project_gym.utilservices.authenticatedservices;
 
 import com.example.project_gym.domain.entity.TraineeEntity;
 import com.example.project_gym.domain.entity.TrainerEntity;
-import com.example.project_gym.model.request.PasswordChangeRequest;
+import com.example.project_gym.exception.InvalidPasswordChangeException;
+import com.example.project_gym.exception.PasswordMismatchException;
+import com.example.project_gym.exception.UserNotFoundException;
+import com.example.project_gym.model.request.update.PasswordChangeRequest;
 import com.example.project_gym.repository.idao.TraineeDAO;
 import com.example.project_gym.repository.idao.TrainerDAO;
 import com.example.project_gym.security.AuthenticationGuard;
-import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,26 +17,29 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class PasswordChangeService {
 
-    @Autowired
     private TraineeDAO traineeDao;
 
-    @Autowired
     private TrainerDAO trainerDao;
 
     private AuthenticationGuard authGuard;
 
-    @Autowired
-    public void setAuthenticationGuard(AuthenticationGuard authGuard) {
+    public PasswordChangeService(TraineeDAO traineeDao, TrainerDAO trainerDao, AuthenticationGuard authGuard) {
+        this.traineeDao = traineeDao;
+        this.trainerDao = trainerDao;
         this.authGuard = authGuard;
     }
 
     public void changeTraineePassword(PasswordChangeRequest passwordChangeRequest) {
         authGuard.requireAuthenticated();
-        TraineeEntity traineeEntity = traineeDao.findByUsername(passwordChangeRequest.username())
-                .orElseThrow(() -> new EntityNotFoundException("Trainee with username " + passwordChangeRequest.username() + " not found"));
+        TraineeEntity traineeEntity = traineeDao.getByUsername(passwordChangeRequest.username())
+                .orElseThrow(() -> new UserNotFoundException("Trainee with username " + passwordChangeRequest.username() + " not found"));
+
+        if (passwordChangeRequest.oldPassword().equals(passwordChangeRequest.newPassword())) {
+            throw new InvalidPasswordChangeException("New password must differ from old password");
+        }
 
         if (!traineeEntity.getUser().getPassword().equals(passwordChangeRequest.oldPassword())) {
-            throw new IllegalArgumentException("Old password is incorrect");
+            throw new PasswordMismatchException("Old password is incorrect");
         }
 
         traineeEntity.getUser().setPassword(passwordChangeRequest.newPassword());
@@ -43,11 +48,15 @@ public class PasswordChangeService {
 
     public void changeTrainerPassword(PasswordChangeRequest passwordChangeRequest) {
         authGuard.requireAuthenticated();
-        TrainerEntity trainerEntity = trainerDao.findByUsername(passwordChangeRequest.username())
-                .orElseThrow(() -> new EntityNotFoundException("Trainer with username " + passwordChangeRequest.username() + " not found"));
+        TrainerEntity trainerEntity = trainerDao.getByUsername(passwordChangeRequest.username())
+                .orElseThrow(() -> new UserNotFoundException("Trainer with username " + passwordChangeRequest.username() + " not found"));
+
+        if (passwordChangeRequest.oldPassword().equals(passwordChangeRequest.newPassword())) {
+            throw new InvalidPasswordChangeException("New password must differ from old password");
+        }
 
         if (!trainerEntity.getUser().getPassword().equals(passwordChangeRequest.oldPassword())) {
-            throw new IllegalArgumentException("Old password is incorrect");
+            throw new PasswordMismatchException("Old password is incorrect");
         }
 
         trainerEntity.getUser().setPassword(passwordChangeRequest.newPassword());

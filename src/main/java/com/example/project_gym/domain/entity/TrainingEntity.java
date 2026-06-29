@@ -31,7 +31,7 @@ public class TrainingEntity {
 
     @ManyToOne
     @JoinColumn(name = "training_type_id")
-    private TrainingType trainingType;
+    private TrainingTypeEntity trainingTypeEntity;
 
     @Column(name = "training_date", nullable = false)
     private LocalDateTime trainingDate;

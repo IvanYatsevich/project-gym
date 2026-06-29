@@ -25,16 +25,15 @@ public class TrainerDaoHibernate implements TrainerDAO {
     @PersistenceContext
     private EntityManager entityManager;
 
+
+
     @Override
     public TrainerEntity create(TrainerEntity trainerEntity) {
         entityManager.persist(trainerEntity);
         return trainerEntity;
     }
 
-    @Override
-    public Optional<TrainerEntity> findById(Long id) {
-        return Optional.ofNullable(entityManager.find(TrainerEntity.class, id));
-    }
+
 
     @Override
     public TrainerEntity update(TrainerEntity trainerEntity) {
@@ -42,7 +41,7 @@ public class TrainerDaoHibernate implements TrainerDAO {
     }
 
     @Override
-    public Optional<TrainerEntity> findByUsername(String username) {
+    public Optional<TrainerEntity> getByUsername(String username) {
         TypedQuery<TrainerEntity> query = entityManager.createQuery("SELECT t FROM TrainerEntity t WHERE t.user.userName = :userName", TrainerEntity.class);
         query.setParameter("userName", username);
         return query.getResultList().stream().findFirst();
@@ -50,7 +49,7 @@ public class TrainerDaoHibernate implements TrainerDAO {
 
     @Override
     public boolean deleteByUsername(String username) {
-        Optional<TrainerEntity> trainer = findByUsername(username);
+        Optional<TrainerEntity> trainer = getByUsername(username);
         if (trainer.isPresent()) {
             entityManager.remove(trainer.get());
             return true;

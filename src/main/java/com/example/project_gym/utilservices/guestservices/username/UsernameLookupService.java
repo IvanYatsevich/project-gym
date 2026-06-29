@@ -22,6 +22,6 @@ public class UsernameLookupService {
     }
 
     public boolean existsByUserName(String userName) {
-        return trainerDao.findByUsername(userName).isPresent() || traineeDao.findByUsername(userName).isPresent();
+        return trainerDao.getByUsername(userName).isPresent() || traineeDao.getByUsername(userName).isPresent();
     }
 }

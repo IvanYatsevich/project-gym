@@ -9,9 +9,8 @@ import java.util.Optional;
 
 public interface TrainerDAO {
     TrainerEntity create(TrainerEntity trainerEntity);
-    Optional<TrainerEntity> findById(Long id);
     TrainerEntity update(TrainerEntity trainerEntity);
-    Optional<TrainerEntity> findByUsername(String username);
+    Optional<TrainerEntity> getByUsername(String username);
     boolean deleteByUsername(String username);
     List<TrainingEntity> getTrainings(String trainerUsername, LocalDateTime fromDate, LocalDateTime toDate, String traineeName);
 }

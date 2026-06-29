@@ -21,7 +21,7 @@ public class TrainerEntity {
 
     @ManyToOne
     @JoinColumn(name = "training_type_id", nullable = false)
-    private TrainingType trainingType;
+    private TrainingTypeEntity trainingTypeEntity;
 
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "user_id")

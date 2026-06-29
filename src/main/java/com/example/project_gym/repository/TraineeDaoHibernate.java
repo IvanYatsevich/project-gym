@@ -47,7 +47,7 @@ public class TraineeDaoHibernate implements TraineeDAO {
     }
 
     @Override
-    public Optional<TraineeEntity> findById(Long id) {
+    public Optional<TraineeEntity> getById(Long id) {
         return Optional.ofNullable(entityManager.find(TraineeEntity.class, id));
     }
 
@@ -57,18 +57,17 @@ public class TraineeDaoHibernate implements TraineeDAO {
     }
 
     @Override
-    public Optional<TraineeEntity> findByUsername(String username) {
+    public Optional<TraineeEntity> getByUsername(String username) {
         TypedQuery<TraineeEntity> query = entityManager.createQuery(
                 "SELECT t FROM TraineeEntity t WHERE t.user.userName = :userName",
-            TraineeEntity.class
-        );
+            TraineeEntity.class);
         query.setParameter("userName", username);
         return query.getResultList().stream().findFirst();
     }
 
     @Override
     public boolean deleteByUsername(String username) {
-        Optional<TraineeEntity> trainee = findByUsername(username);
+        Optional<TraineeEntity> trainee = getByUsername(username);
         if (trainee.isPresent()) {
             detachFromAssignedTrainers(trainee.get());
             entityManager.remove(trainee.get());
@@ -107,27 +106,27 @@ public class TraineeDaoHibernate implements TraineeDAO {
     }
 
     @Override
-    public List<TrainerEntity> findUnassignedTrainers(String traineeUsername) {
+    public List<TrainerEntity> getUnassignedTrainers(String traineeUsername) {
         TypedQuery<TrainerEntity> query = entityManager.createQuery(
-                "SELECT DISTINCT tr FROM TrainerEntity tr WHERE tr NOT IN (SELECT tr2 FROM TraineeEntity t JOIN t.trainerEntities tr2 WHERE t.user.userName = :traineeUsername)", TrainerEntity.class);
+                "SELECT DISTINCT tr FROM TrainerEntity tr WHERE tr.user.isActive = true AND tr NOT IN (SELECT tr2 FROM TraineeEntity t JOIN t.trainerEntities tr2 WHERE t.user.userName = :traineeUsername)", TrainerEntity.class);
         query.setParameter("traineeUsername", traineeUsername);
         return query.getResultList();
     }
 
     @Override
-    public void updateTrainersList(TraineeEntity traineeEntity, List<TrainerEntity> trainerEntities) {
-        TraineeEntity managedTraineeEntity = entityManager.merge(traineeEntity);
+    public void updateTrainersList(TraineeEntity trainee, List<TrainerEntity> trainers) {
 
-        for (TrainerEntity currentTrainerEntity : new HashSet<>(managedTraineeEntity.getTrainerEntities())) {
-            currentTrainerEntity.getTraineeEntities().remove(managedTraineeEntity);
+        for (TrainerEntity current : new HashSet<>(trainee.getTrainerEntities())) {
+            current.getTraineeEntities().remove(trainee);
         }
-        managedTraineeEntity.getTrainerEntities().clear();
 
-        for (TrainerEntity trainerEntity : trainerEntities) {
-            TrainerEntity managedTrainerEntity = entityManager.merge(trainerEntity);
-            managedTrainerEntity.getTraineeEntities().add(managedTraineeEntity);
-            managedTraineeEntity.getTrainerEntities().add(managedTrainerEntity);
+        trainee.getTrainerEntities().clear();
+
+        for (TrainerEntity trainer : trainers) {
+            trainer.getTraineeEntities().add(trainee);
+            trainee.getTrainerEntities().add(trainer);
         }
+
     }
 
     private void detachFromAssignedTrainers(TraineeEntity traineeEntity) {

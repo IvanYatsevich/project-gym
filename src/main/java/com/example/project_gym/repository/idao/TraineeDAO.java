@@ -11,11 +11,11 @@ import java.util.Optional;
 public interface TraineeDAO {
     TraineeEntity create(TraineeEntity traineeEntity);
     boolean delete(Long id);
-    Optional<TraineeEntity> findById(Long id);
+    Optional<TraineeEntity> getById(Long id);
     TraineeEntity update(TraineeEntity traineeEntity);
-    Optional<TraineeEntity> findByUsername(String username);
+    Optional<TraineeEntity> getByUsername(String username);
     boolean deleteByUsername(String username);
     List<TrainingEntity> getTrainings(String traineeUsername, LocalDateTime fromDate, LocalDateTime toDate, String trainerName, String trainingType);
-    List<TrainerEntity> findUnassignedTrainers(String traineeUsername);
+    List<TrainerEntity> getUnassignedTrainers(String traineeUsername);
     void updateTrainersList(TraineeEntity traineeEntity, List<TrainerEntity> trainerEntities);
 }

@@ -1,7 +1,7 @@
 package com.example.project_gym.utilservices.guestservices;
 
-import com.example.project_gym.model.request.CreateTraineeRequest;
-import com.example.project_gym.model.request.CreateTrainerRequest;
+import com.example.project_gym.model.request.create.TraineeCreateRequest;
+import com.example.project_gym.model.request.create.TrainerCreateRequest;
 import org.springframework.stereotype.Component;
 
 import java.text.ParseException;
@@ -14,7 +14,7 @@ import java.util.Arrays;
 @Component
 public class ProfileCreationParserService {
 
-    public CreateTrainerRequest parseTrainerCreate(String input) {
+    public TrainerCreateRequest parseTrainerCreate(String input) {
         String[] parts = input.split("\\s+");
 
         if (parts.length < 5) {
@@ -29,10 +29,10 @@ public class ProfileCreationParserService {
             throw new IllegalArgumentException("trainer create requires firstName, lastName and trainingTypeName.");
         }
 
-        return new CreateTrainerRequest(firstName, lastName, trainingTypeName);
+        return new TrainerCreateRequest(firstName, lastName, trainingTypeName);
     }
 
-    public CreateTraineeRequest parseTraineeCreate(String input) {
+    public TraineeCreateRequest parseTraineeCreate(String input) {
         String[] parts = input.split("\\s+");
 
         if (parts.length < 4) {
@@ -61,7 +61,7 @@ public class ProfileCreationParserService {
             }
         }
 
-        return new CreateTraineeRequest(firstName, lastName, dateOfBirth, address);
+        return new TraineeCreateRequest(firstName, lastName, dateOfBirth, address);
     }
 
     private LocalDateTime parseDate(String value) {
