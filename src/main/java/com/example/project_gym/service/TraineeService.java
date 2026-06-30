@@ -23,7 +23,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 @Service
-@Transactional
 public class TraineeService {
 
     @Autowired
@@ -34,9 +33,6 @@ public class TraineeService {
 
     @Setter
     private UniqueUserNameGenerator nameGenerator;
-
-    @Setter
-    private PasswordGenerator passwordGenerator;
 
     private AuthenticationGuard authGuard;
 
@@ -60,7 +56,7 @@ public class TraineeService {
         user.setFirstName(createTraineeRequest.firstName());
         user.setLastName(createTraineeRequest.lastName());
         user.setUserName(nameGenerator.generateUnique(createTraineeRequest.firstName(), createTraineeRequest.lastName()));
-        user.setPassword(passwordGenerator.generatePassword());
+        user.setPassword(PasswordGenerator.generatePassword());
         user.setActive(true);
 
         traineeEntity.setDateOfBirth(createTraineeRequest.dateOfBirth());

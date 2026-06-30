@@ -22,7 +22,6 @@ import java.util.NoSuchElementException;
 import java.util.Optional;
 
 @Repository
-@Primary
 public class TraineeDaoHibernate implements TraineeDAO {
 
     @PersistenceContext

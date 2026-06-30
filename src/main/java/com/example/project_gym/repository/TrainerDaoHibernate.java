@@ -19,7 +19,6 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-@Primary
 public class TrainerDaoHibernate implements TrainerDAO {
 
     @PersistenceContext

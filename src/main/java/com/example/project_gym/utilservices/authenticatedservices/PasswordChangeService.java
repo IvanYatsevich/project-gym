@@ -12,7 +12,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@Transactional
 public class PasswordChangeService {
 
     @Autowired
@@ -28,6 +27,7 @@ public class PasswordChangeService {
         this.authGuard = authGuard;
     }
 
+    @Transactional
     public void changeTraineePassword(PasswordChangeRequest passwordChangeRequest) {
         authGuard.requireAuthenticated();
         TraineeEntity traineeEntity = traineeDao.findByUsername(passwordChangeRequest.username())
@@ -40,7 +40,7 @@ public class PasswordChangeService {
         traineeEntity.getUser().setPassword(passwordChangeRequest.newPassword());
         traineeDao.update(traineeEntity);
     }
-
+    @Transactional
     public void changeTrainerPassword(PasswordChangeRequest passwordChangeRequest) {
         authGuard.requireAuthenticated();
         TrainerEntity trainerEntity = trainerDao.findByUsername(passwordChangeRequest.username())

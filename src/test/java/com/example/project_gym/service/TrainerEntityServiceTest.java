@@ -58,7 +58,6 @@ class TrainerEntityServiceTest {
         ReflectionTestUtils.setField(trainerService, "trainingTypeDao", trainingTypeDao);
         ReflectionTestUtils.setField(trainerService, "passwordChangeService", passwordChangeService);
         trainerService.setUserNameGenerator(userNameGenerator);
-        trainerService.setPasswordGenerator(passwordGenerator);
         trainerService.setAuthenticationGuard(authGuard);
     }
 
@@ -68,7 +67,6 @@ class TrainerEntityServiceTest {
         cardio.setTrainingTypeName("CARDIO");
         when(trainingTypeDao.findByTrainingTypeName("CARDIO")).thenReturn(Optional.of(cardio));
         when(userNameGenerator.generateUnique("Ivan", "Ivanov")).thenReturn("Ivan.Ivanov");
-        when(passwordGenerator.generatePassword()).thenReturn("Pass12345");
 
         TrainerEntity result = trainerService.create(new CreateTrainerRequest("Ivan", "Ivanov", "CARDIO"));
 
@@ -76,6 +74,8 @@ class TrainerEntityServiceTest {
         assertEquals("Ivan.Ivanov", result.getUser().getUserName());
         assertTrue(result.getUser().isActive());
         assertEquals("CARDIO", result.getTrainingType().getTrainingTypeName());
+        assertNotNull(result.getUser().getPassword());
+        assertEquals(10, result.getUser().getPassword().length());
         verify(trainerDao).create(any(TrainerEntity.class));
         verifyNoInteractions(authGuard);
     }

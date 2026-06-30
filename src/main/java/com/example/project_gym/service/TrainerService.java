@@ -37,9 +37,6 @@ public class TrainerService {
     @Setter
     private UniqueUserNameGenerator nameGenerator;
 
-    @Setter
-    private PasswordGenerator passwordGenerator;
-
     private AuthenticationGuard authGuard;
 
     @Autowired
@@ -66,7 +63,7 @@ public class TrainerService {
         user.setFirstName(createTrainerRequest.firstName());
         user.setLastName(createTrainerRequest.lastName());
         user.setUserName(nameGenerator.generateUnique(createTrainerRequest.firstName(), createTrainerRequest.lastName()));
-        user.setPassword(passwordGenerator.generatePassword());
+        user.setPassword(PasswordGenerator.generatePassword());
         user.setActive(true);
         
         trainerEntity.setUser(user);

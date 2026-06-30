@@ -14,7 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.naming.AuthenticationException;
 
 @Service
-@Transactional(readOnly = true)
 public class AuthenticationService {
 
     @Autowired
@@ -42,7 +41,7 @@ public class AuthenticationService {
                 .map(trainer -> trainer.getUser().getPassword().equals(password))
                 .orElse(false);
     }
-
+    @Transactional
     public UserType authenticate(String username, String password) throws AuthenticationException {
         if (authenticateTrainee(username, password)) {
             authorizationContext.authenticate(username, UserType.TRAINEE);
@@ -57,11 +56,11 @@ public class AuthenticationService {
         authorizationContext.clear();
         throw new AuthenticationException("Username or password are invalid");
     }
-
+    @Transactional
     public UserType authenticate(LoginRequest loginRequest) throws AuthenticationException {
         return authenticate(loginRequest.username(), loginRequest.password());
     }
-
+    @Transactional
     public void logout() {
         authorizationContext.clear();
     }

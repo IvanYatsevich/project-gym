@@ -42,8 +42,6 @@ class TraineeEntityServiceTest {
     @Mock
     private UniqueUserNameGenerator userNameGenerator;
     @Mock
-    private PasswordGenerator passwordGenerator;
-    @Mock
     private AuthenticationGuard authGuard;
 
     private TraineeService traineeService;
@@ -54,7 +52,6 @@ class TraineeEntityServiceTest {
         ReflectionTestUtils.setField(traineeService, "traineeDao", traineeDao);
         ReflectionTestUtils.setField(traineeService, "passwordChangeService", passwordChangeService);
         traineeService.setUserNameGenerator(userNameGenerator);
-        traineeService.setPasswordGenerator(passwordGenerator);
         traineeService.setAuthenticationGuard(authGuard);
     }
 
@@ -62,7 +59,6 @@ class TraineeEntityServiceTest {
     void create_shouldCreateTrainee() {
         LocalDateTime dob = LocalDateTime.now();
         when(userNameGenerator.generateUnique("Hulk", "Hogan")).thenReturn("Hulk.Hogan");
-        when(passwordGenerator.generatePassword()).thenReturn("Pass12345");
 
         TraineeEntity traineeEntity = traineeService.create(new CreateTraineeRequest("Hulk", "Hogan", dob, "NY"));
 
@@ -70,6 +66,8 @@ class TraineeEntityServiceTest {
         assertEquals("Hulk.Hogan", traineeEntity.getUser().getUserName());
         assertEquals("NY", traineeEntity.getAddress());
         assertEquals(dob, traineeEntity.getDateOfBirth());
+        assertNotNull(traineeEntity.getUser().getPassword());
+        assertEquals(10, traineeEntity.getUser().getPassword().length());
         verify(traineeDao).create(any(TraineeEntity.class));
         verifyNoInteractions(authGuard);
     }

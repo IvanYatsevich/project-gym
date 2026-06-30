@@ -13,8 +13,6 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-@Transactional
-@Primary
 public class TrainingDaoHibernate implements TrainingDAO {
 
     @PersistenceContext

@@ -5,7 +5,7 @@ import java.security.SecureRandom;
 public class PasswordGenerator {
     private static final String CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
-    public String generatePassword(){
+    public static String generatePassword(){
        SecureRandom random = new SecureRandom();
        StringBuilder password = new StringBuilder();
 

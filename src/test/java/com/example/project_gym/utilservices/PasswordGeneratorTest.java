@@ -9,9 +9,8 @@ class PasswordGeneratorTest {
 
     @Test
     void generatePassword_shouldReturnTenCharAlphaNumeric() {
-        PasswordGenerator generator = new PasswordGenerator();
 
-        String password = generator.generatePassword();
+        String password = PasswordGenerator.generatePassword();
 
         assertNotNull(password);
         assertEquals(10, password.length());
