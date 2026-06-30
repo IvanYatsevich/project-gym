@@ -1,6 +1,6 @@
 package com.example.project_gym.utilservices;
 
-import com.example.project_gym.utilservices.unauthservices.password.PasswordGenerator;
+import com.example.project_gym.utilservices.guestservices.password.PasswordGenerator;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -9,9 +9,8 @@ class PasswordGeneratorTest {
 
     @Test
     void generatePassword_shouldReturnTenCharAlphaNumeric() {
-        PasswordGenerator generator = new PasswordGenerator();
 
-        String password = generator.generatePassword();
+        String password = PasswordGenerator.generatePassword();
 
         assertNotNull(password);
         assertEquals(10, password.length());

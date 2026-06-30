@@ -1,7 +1,7 @@
 package com.example.project_gym.repository;
 
-import com.example.project_gym.model.TrainingType;
-import com.example.project_gym.repository.idao.ITrainingTypeDAO;
+import com.example.project_gym.domain.entity.TrainingType;
+import com.example.project_gym.repository.idao.TrainingTypeDAO;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.TypedQuery;
@@ -11,8 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Optional;
 
 @Repository
-@Transactional(readOnly = true)
-public class TrainingTypeDaoHibernate implements ITrainingTypeDAO {
+public class TrainingTypeDaoHibernate implements TrainingTypeDAO {
 
 	@PersistenceContext
 	private EntityManager entityManager;

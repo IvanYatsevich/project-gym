@@ -1,18 +1,21 @@
 package com.example.project_gym.service;
 
-import com.example.project_gym.model.Trainer;
-import com.example.project_gym.model.Training;
-import com.example.project_gym.model.TrainingType;
-import com.example.project_gym.model.dto.dtoin.PasswordChangeDto;
-import com.example.project_gym.model.dto.dtoin.TrainerDtoIn;
-import com.example.project_gym.model.dto.dtoin.TrainerTrainingsFilterDto;
-import com.example.project_gym.model.dto.dtoupdate.TrainerUpdateDto;
-import com.example.project_gym.repository.idao.ITrainerDAO;
-import com.example.project_gym.repository.idao.ITrainingTypeDAO;
-import com.example.project_gym.utilservices.authservices.PasswordChangeService;
-import com.example.project_gym.utilservices.unauthservices.password.PasswordGenerator;
-import com.example.project_gym.utilservices.unauthservices.username.UniqueUserNameGenerator;
+import com.example.project_gym.domain.entity.TrainerEntity;
+import com.example.project_gym.domain.entity.TrainingEntity;
+import com.example.project_gym.domain.entity.TrainingType;
+import com.example.project_gym.model.request.PasswordChangeRequest;
+import com.example.project_gym.model.request.CreateTrainerRequest;
+import com.example.project_gym.model.request.TrainerTrainingsFilterRequest;
+import com.example.project_gym.model.request.UpdateTrainerRequest;
+import com.example.project_gym.domain.entity.User;
+import com.example.project_gym.repository.idao.TrainerDAO;
+import com.example.project_gym.repository.idao.TrainingTypeDAO;
+import com.example.project_gym.security.AuthenticationGuard;
+import com.example.project_gym.utilservices.authenticatedservices.PasswordChangeService;
+import com.example.project_gym.utilservices.guestservices.password.PasswordGenerator;
+import com.example.project_gym.utilservices.guestservices.username.UniqueUserNameGenerator;
 import jakarta.persistence.EntityNotFoundException;
+import lombok.Setter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,20 +23,26 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 @Service
-@Transactional
 public class TrainerService {
 
     @Autowired
-    private ITrainerDAO trainerDao;
+    private TrainerDAO trainerDao;
 
     @Autowired
-    private ITrainingTypeDAO trainingTypeDao;
+    private TrainingTypeDAO trainingTypeDao;
 
     @Autowired
     private PasswordChangeService passwordChangeService;
 
+    @Setter
     private UniqueUserNameGenerator nameGenerator;
-    private PasswordGenerator passwordGenerator;
+
+    private AuthenticationGuard authGuard;
+
+    @Autowired
+    public void setAuthenticationGuard(AuthenticationGuard authGuard) {
+        this.authGuard = authGuard;
+    }
 
 
     @Autowired
@@ -41,70 +50,65 @@ public class TrainerService {
         this.nameGenerator = nameGenerator;
     }
 
-    @Autowired
-    public void setPasswordGenerator(PasswordGenerator passwordGenerator) {
-        this.passwordGenerator = passwordGenerator;
-    }
+    @Transactional
+    public TrainerEntity create(CreateTrainerRequest createTrainerRequest) {
+        validateTrainerDtoInput(createTrainerRequest);
 
-    public Trainer create(TrainerDtoIn trainerDtoIn) {
-        validateTrainerDtoInput(trainerDtoIn);
+        TrainingType trainingType = resolveTrainingType(createTrainerRequest.specialization());
 
-        TrainingType trainingType = resolveTrainingType(trainerDtoIn.specialization());
+        TrainerEntity trainerEntity = new TrainerEntity();
+        trainerEntity.setTrainingType(trainingType);
 
-        Trainer trainer = new Trainer();
-        trainer.setTrainingType(trainingType);
-
-        com.example.project_gym.model.User user = new com.example.project_gym.model.User();
-        user.setFirstName(trainerDtoIn.firstName());
-        user.setLastName(trainerDtoIn.lastName());
-        user.setUserName(nameGenerator.generateUnique(trainerDtoIn.firstName(), trainerDtoIn.lastName()));
-        user.setPassword(passwordGenerator.generatePassword());
+        User user = new User();
+        user.setFirstName(createTrainerRequest.firstName());
+        user.setLastName(createTrainerRequest.lastName());
+        user.setUserName(nameGenerator.generateUnique(createTrainerRequest.firstName(), createTrainerRequest.lastName()));
+        user.setPassword(PasswordGenerator.generatePassword());
         user.setActive(true);
         
-        trainer.setUser(user);
-        trainerDao.create(trainer);
-        return trainer;
+        trainerEntity.setUser(user);
+        trainerDao.create(trainerEntity);
+        return trainerEntity;
     }
 
     @Transactional(readOnly = true)
-    public Trainer selectByUsername(String username) {
-        return trainerDao.selectByUsername(username)
+    public TrainerEntity selectByUsername(String username) {
+        authGuard.requireAuthenticated();
+        return trainerDao.findByUsername(username)
                 .orElseThrow(() -> new EntityNotFoundException("Trainer with username " + username + " not found"));
     }
 
-    @Transactional(readOnly = true)
-    public boolean authenticate(String username, String password) {
-        return trainerDao.selectByUsername(username)
-                .map(trainer -> trainer.getUser().getPassword().equals(password))
-                .orElseThrow(() -> new IllegalArgumentException("Username or password are invalid"));
+    @Transactional
+    public void changePassword(PasswordChangeRequest passwordChangeRequest) {
+        authGuard.requireAuthenticated();
+        passwordChangeService.changeTrainerPassword(passwordChangeRequest);
     }
-
-    public void changePassword(PasswordChangeDto passwordChangeDto) {
-        passwordChangeService.changeTrainerPassword(passwordChangeDto);
-    }
-
-    public Trainer update(Long id, TrainerUpdateDto trainerUpdateDto) {
-        validateTrainerUpdateDto(trainerUpdateDto);
+    @Transactional
+    public TrainerEntity update(Long id, UpdateTrainerRequest updateTrainerRequest) {
+        authGuard.requireAuthenticated();
+        validateTrainerUpdateDto(updateTrainerRequest);
         
-        Trainer existingTrainer = trainerDao.selectById(id)
+        TrainerEntity existingTrainerEntity = trainerDao.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Trainer not found"));
 
-        existingTrainer.getUser().setActive(trainerUpdateDto.isActive());
-        existingTrainer.setTrainingType(resolveTrainingType(trainerUpdateDto.specialization()));
+        existingTrainerEntity.getUser().setActive(updateTrainerRequest.isActive());
+        existingTrainerEntity.setTrainingType(resolveTrainingType(updateTrainerRequest.specialization()));
 
-        trainerDao.update(existingTrainer);
-        return existingTrainer;
+        trainerDao.update(existingTrainerEntity);
+        return existingTrainerEntity;
     }
-
-    public Trainer toggleActive(String username) {
-        Trainer trainer = selectByUsername(username);
-        trainer.getUser().setActive(!trainer.getUser().isActive());
-        trainerDao.update(trainer);
-        return trainer;
+    @Transactional
+    public TrainerEntity toggleActive(String username) {
+        authGuard.requireAuthenticated();
+        TrainerEntity trainerEntity = selectByUsername(username);
+        trainerEntity.getUser().setActive(!trainerEntity.getUser().isActive());
+        trainerDao.update(trainerEntity);
+        return trainerEntity;
     }
 
     @Transactional(readOnly = true)
-    public List<Training> getTrainings(TrainerTrainingsFilterDto filterDto) {
+    public List<TrainingEntity> getTrainings(TrainerTrainingsFilterRequest filterDto) {
+        authGuard.requireAuthenticated();
         return trainerDao.getTrainings(
             filterDto.trainerUsername(),
             filterDto.fromDate(),
@@ -114,31 +118,32 @@ public class TrainerService {
     }
 
     @Transactional(readOnly = true)
-    public Trainer select(Long id) {
-        return trainerDao.selectById(id)
+    public TrainerEntity select(Long id) {
+        authGuard.requireAuthenticated();
+        return trainerDao.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Trainer not found"));
     }
 
-    private void validateTrainerDtoInput(TrainerDtoIn trainerDtoIn) {
-        if (trainerDtoIn.firstName() == null || trainerDtoIn.firstName().trim().isEmpty()) {
+    private void validateTrainerDtoInput(CreateTrainerRequest createTrainerRequest) {
+        if (createTrainerRequest.firstName() == null || createTrainerRequest.firstName().trim().isEmpty()) {
             throw new IllegalArgumentException("First name is required");
         }
-        if (trainerDtoIn.lastName() == null || trainerDtoIn.lastName().trim().isEmpty()) {
+        if (createTrainerRequest.lastName() == null || createTrainerRequest.lastName().trim().isEmpty()) {
             throw new IllegalArgumentException("Last name is required");
         }
-        if (trainerDtoIn.specialization() == null || trainerDtoIn.specialization().trim().isEmpty()) {
+        if (createTrainerRequest.specialization() == null || createTrainerRequest.specialization().trim().isEmpty()) {
             throw new IllegalArgumentException("Specialization is required");
         }
     }
 
-    private void validateTrainerUpdateDto(TrainerUpdateDto trainerUpdateDto) {
-        if (trainerUpdateDto == null) {
+    private void validateTrainerUpdateDto(UpdateTrainerRequest updateTrainerRequest) {
+        if (updateTrainerRequest == null) {
             throw new IllegalArgumentException("Trainer update data is required");
         }
-        if (trainerUpdateDto.isActive() == null) {
+        if (updateTrainerRequest.isActive() == null) {
             throw new IllegalArgumentException("isActive is required");
         }
-        if (trainerUpdateDto.specialization() == null || trainerUpdateDto.specialization().trim().isEmpty()) {
+        if (updateTrainerRequest.specialization() == null || updateTrainerRequest.specialization().trim().isEmpty()) {
             throw new IllegalArgumentException("Specialization is required");
         }
     }

@@ -1,7 +1,7 @@
 package com.example.project_gym.repository;
 
-import com.example.project_gym.model.Training;
-import com.example.project_gym.repository.idao.ITrainingDAO;
+import com.example.project_gym.domain.entity.TrainingEntity;
+import com.example.project_gym.repository.idao.TrainingDAO;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.TypedQuery;
@@ -13,31 +13,27 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-@Transactional
-@Primary
-public class TrainingDaoHibernate implements ITrainingDAO {
+public class TrainingDaoHibernate implements TrainingDAO {
 
     @PersistenceContext
     private EntityManager entityManager;
 
     @Override
-    public Training create(Training training) {
-        entityManager.persist(training);
-        return training;
+    public TrainingEntity create(TrainingEntity trainingEntity) {
+        entityManager.persist(trainingEntity);
+        return trainingEntity;
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public Optional<Training> getById(Long id) {
-        return Optional.ofNullable(entityManager.find(Training.class, id));
+    public Optional<TrainingEntity> findById(Long id) {
+        return Optional.ofNullable(entityManager.find(TrainingEntity.class, id));
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public List<Training> getAll() {
-        TypedQuery<Training> query = entityManager.createQuery(
-            "SELECT t FROM Training t",
-            Training.class
+    public List<TrainingEntity> getAll() {
+        TypedQuery<TrainingEntity> query = entityManager.createQuery(
+            "SELECT t FROM TrainingEntity t",
+            TrainingEntity.class
         );
         return query.getResultList();
     }

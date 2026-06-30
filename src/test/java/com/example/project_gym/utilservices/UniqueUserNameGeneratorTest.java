@@ -1,8 +1,8 @@
 package com.example.project_gym.utilservices;
 
-import com.example.project_gym.utilservices.unauthservices.username.RawUserNameGenerator;
-import com.example.project_gym.utilservices.unauthservices.username.UniqueUserNameGenerator;
-import com.example.project_gym.utilservices.unauthservices.username.UsernameLookupService;
+import com.example.project_gym.utilservices.guestservices.username.RawUserNameGenerator;
+import com.example.project_gym.utilservices.guestservices.username.UniqueUserNameGenerator;
+import com.example.project_gym.utilservices.guestservices.username.UsernameLookupService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

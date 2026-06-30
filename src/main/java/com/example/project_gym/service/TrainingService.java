@@ -1,12 +1,13 @@
 package com.example.project_gym.service;
 
-import com.example.project_gym.model.Trainee;
-import com.example.project_gym.model.Trainer;
-import com.example.project_gym.model.Training;
-import com.example.project_gym.model.dto.dtoin.TrainingDtoIn;
-import com.example.project_gym.repository.idao.ITraineeDAO;
-import com.example.project_gym.repository.idao.ITrainerDAO;
-import com.example.project_gym.repository.idao.ITrainingDAO;
+import com.example.project_gym.domain.entity.TraineeEntity;
+import com.example.project_gym.domain.entity.TrainerEntity;
+import com.example.project_gym.domain.entity.TrainingEntity;
+import com.example.project_gym.model.request.CreateTrainingRequest;
+import com.example.project_gym.repository.idao.TraineeDAO;
+import com.example.project_gym.repository.idao.TrainerDAO;
+import com.example.project_gym.repository.idao.TrainingDAO;
+import com.example.project_gym.security.AuthenticationGuard;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -15,52 +16,61 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 @Service
-@Transactional
 public class TrainingService {
 
     @Autowired
-    private ITrainingDAO trainingDao;
+    private TrainingDAO trainingDao;
 
     @Autowired
-    private ITrainerDAO trainerDao;
+    private TrainerDAO trainerDao;
 
     @Autowired
-    private ITraineeDAO traineeDao;
+    private TraineeDAO traineeDao;
+
+    private AuthenticationGuard authGuard;
+
+    @Autowired
+    public void setAuthenticationGuard(AuthenticationGuard authGuard) {
+        this.authGuard = authGuard;
+    }
 
 
     @Transactional
-    public Training create(TrainingDtoIn dto) {
+    public TrainingEntity create(CreateTrainingRequest dto) {
+        authGuard.requireAuthenticated();
         validateTrainingDtoInput(dto);
 
-        Trainee trainee = traineeDao.selectById(dto.traineeId())
+        TraineeEntity traineeEntity = traineeDao.findById(dto.traineeId())
                 .orElseThrow(() -> new EntityNotFoundException("Trainee not found"));
 
-        Trainer trainer = trainerDao.selectById(dto.trainerId())
+        TrainerEntity trainerEntity = trainerDao.findById(dto.trainerId())
                 .orElseThrow(() -> new EntityNotFoundException("Trainer not found"));
 
-        Training training = new Training();
-        training.setTrainee(trainee);
-        training.setTrainer(trainer);
-        training.setTrainingName(dto.trainingName());
-        training.setTrainingDate(dto.trainingDate());
-        training.setTrainingDuration(dto.trainingDuration());
-        training.setTrainingType(dto.trainingType());
+        TrainingEntity trainingEntity = new TrainingEntity();
+        trainingEntity.setTraineeEntity(traineeEntity);
+        trainingEntity.setTrainerEntity(trainerEntity);
+        trainingEntity.setTrainingName(dto.trainingName());
+        trainingEntity.setTrainingDate(dto.trainingDate());
+        trainingEntity.setTrainingDuration(dto.trainingDuration());
+        trainingEntity.setTrainingType(dto.trainingType());
 
-        return trainingDao.create(training);
+        return trainingDao.create(trainingEntity);
     }
 
     @Transactional(readOnly = true)
-    public Training select(Long id) {
-        return trainingDao.getById(id)
+    public TrainingEntity select(Long id) {
+        authGuard.requireAuthenticated();
+        return trainingDao.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Training not found"));
     }
 
     @Transactional(readOnly = true)
-    public List<Training> getAll() {
+    public List<TrainingEntity> getAll() {
+        authGuard.requireAuthenticated();
         return trainingDao.getAll();
     }
 
-    private void validateTrainingDtoInput(TrainingDtoIn dto) {
+    private void validateTrainingDtoInput(CreateTrainingRequest dto) {
         if (dto.traineeId() == null) {
             throw new IllegalArgumentException("Trainee ID is required");
         }

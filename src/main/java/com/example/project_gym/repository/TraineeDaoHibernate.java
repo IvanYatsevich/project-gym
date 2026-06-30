@@ -1,65 +1,65 @@
 package com.example.project_gym.repository;
 
-import com.example.project_gym.model.Trainee;
-import com.example.project_gym.model.Trainer;
-import com.example.project_gym.model.Training;
-import com.example.project_gym.repository.idao.ITraineeDAO;
+import com.example.project_gym.domain.entity.TraineeEntity;
+import com.example.project_gym.domain.entity.TrainerEntity;
+import com.example.project_gym.domain.entity.TrainingEntity;
+import com.example.project_gym.repository.idao.TraineeDAO;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.TypedQuery;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
+import java.util.ArrayList;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 
 @Repository
-@Transactional
-@Primary
-public class TraineeDaoHibernate implements ITraineeDAO {
+public class TraineeDaoHibernate implements TraineeDAO {
 
     @PersistenceContext
     private EntityManager entityManager;
 
     @Override
-    public Trainee create(Trainee trainee) {
-        entityManager.persist(trainee);
-        return trainee;
+    public TraineeEntity create(TraineeEntity traineeEntity) {
+        entityManager.persist(traineeEntity);
+        return traineeEntity;
     }
 
     @Override
     public boolean delete(Long id) {
-        Trainee trainee = entityManager.find(Trainee.class, id);
-        if (trainee == null) {
+        TraineeEntity traineeEntity = entityManager.find(TraineeEntity.class, id);
+        if (traineeEntity == null) {
             throw new NoSuchElementException("Trainee not found");
         }
 
-        detachFromAssignedTrainers(trainee);
-        entityManager.remove(trainee);
+        detachFromAssignedTrainers(traineeEntity);
+        entityManager.remove(traineeEntity);
         return true;
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public Optional<Trainee> selectById(Long id) {
-        return Optional.ofNullable(entityManager.find(Trainee.class, id));
+    public Optional<TraineeEntity> findById(Long id) {
+        return Optional.ofNullable(entityManager.find(TraineeEntity.class, id));
     }
 
     @Override
-    public Trainee update(Trainee trainee) {
-        return entityManager.merge(trainee);
+    public TraineeEntity update(TraineeEntity traineeEntity) {
+        return entityManager.merge(traineeEntity);
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public Optional<Trainee> selectByUsername(String username) {
-        TypedQuery<Trainee> query = entityManager.createQuery(
-            "SELECT t FROM Trainee t WHERE t.user.userName = :userName",
-            Trainee.class
+    public Optional<TraineeEntity> findByUsername(String username) {
+        TypedQuery<TraineeEntity> query = entityManager.createQuery(
+                "SELECT t FROM TraineeEntity t WHERE t.user.userName = :userName",
+            TraineeEntity.class
         );
         query.setParameter("userName", username);
         return query.getResultList().stream().findFirst();
@@ -67,7 +67,7 @@ public class TraineeDaoHibernate implements ITraineeDAO {
 
     @Override
     public boolean deleteByUsername(String username) {
-        Optional<Trainee> trainee = selectByUsername(username);
+        Optional<TraineeEntity> trainee = findByUsername(username);
         if (trainee.isPresent()) {
             detachFromAssignedTrainers(trainee.get());
             entityManager.remove(trainee.get());
@@ -77,79 +77,62 @@ public class TraineeDaoHibernate implements ITraineeDAO {
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public List<Training> getTrainings(String traineeUsername, Date fromDate, Date toDate, String trainerName, String trainingType) {
-        StringBuilder query = new StringBuilder("SELECT tr FROM Training tr WHERE tr.trainee.user.userName = :traineeUsername");
+    public List<TrainingEntity> getTrainings(String traineeUsername, LocalDateTime fromDate, LocalDateTime toDate, String trainerName, String trainingType) {
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<TrainingEntity> cq = cb.createQuery(TrainingEntity.class);
+        Root<TrainingEntity> training = cq.from(TrainingEntity.class);
 
-        validateAndAppendTrainingParameters(fromDate, toDate, trainerName, trainingType, query);
+        List<Predicate> predicates = new ArrayList<>();
+        predicates.add(cb.equal(training.get("traineeEntity").get("user").get("userName"), traineeUsername));
 
-        TypedQuery<Training> typedQuery = entityManager.createQuery(query.toString(), Training.class);
-        typedQuery.setParameter("traineeUsername", traineeUsername);
-
-        setTrainingParameters(fromDate, toDate, trainerName, trainingType, typedQuery);
-
-        return typedQuery.getResultList();
-    }
-
-    private static void setTrainingParameters(Date fromDate, Date toDate, String trainerName, String trainingType, TypedQuery<Training> typedQuery) {
         if (fromDate != null) {
-            typedQuery.setParameter("fromDate", fromDate);
+            predicates.add(cb.greaterThanOrEqualTo(training.get("trainingDate"), fromDate));
         }
         if (toDate != null) {
-            typedQuery.setParameter("toDate", toDate);
+            predicates.add(cb.lessThanOrEqualTo(training.get("trainingDate"), toDate));
         }
         if (trainerName != null && !trainerName.isEmpty()) {
-            typedQuery.setParameter("trainerName", "%" + trainerName + "%");
+            String pattern = "%" + trainerName.toLowerCase() + "%";
+            Predicate byFirstName = cb.like(cb.lower(training.get("trainerEntity").get("user").get("firstName")), pattern);
+            Predicate byLastName = cb.like(cb.lower(training.get("trainerEntity").get("user").get("lastName")), pattern);
+            predicates.add(cb.or(byFirstName, byLastName));
         }
         if (trainingType != null && !trainingType.isEmpty()) {
-            typedQuery.setParameter("trainingType", trainingType);
+            predicates.add(cb.equal(training.get("trainingType").get("trainingTypeName"), trainingType));
         }
-    }
 
-    private static void validateAndAppendTrainingParameters(Date fromDate, Date toDate, String trainerName, String trainingType, StringBuilder query) {
-        if (fromDate != null) {
-            query.append(" AND tr.trainingDate >= :fromDate");
-        }
-        if (toDate != null) {
-            query.append(" AND tr.trainingDate <= :toDate");
-        }
-        if (trainerName != null && !trainerName.isEmpty()) {
-            query.append(" AND (LOWER(tr.trainer.user.firstName) LIKE LOWER(:trainerName) OR LOWER(tr.trainer.user.lastName) LIKE LOWER(:trainerName))");
-        }
-        if (trainingType != null && !trainingType.isEmpty()) {
-            query.append(" AND tr.trainingType.trainingTypeName = :trainingType");
-        }
+        cq.select(training).where(cb.and(predicates.toArray(new Predicate[0])));
+        return entityManager.createQuery(cq).getResultList();
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public List<Trainer> findUnassignedTrainers(String traineeUsername) {
-        TypedQuery<Trainer> query = entityManager.createQuery(
-            "SELECT DISTINCT tr FROM Trainer tr WHERE tr NOT IN (SELECT tr2 FROM Trainee t JOIN t.trainers tr2 WHERE t.user.userName = :traineeUsername)", Trainer.class);
+    public List<TrainerEntity> findUnassignedTrainers(String traineeUsername) {
+        TypedQuery<TrainerEntity> query = entityManager.createQuery(
+                "SELECT DISTINCT tr FROM TrainerEntity tr WHERE tr NOT IN (SELECT tr2 FROM TraineeEntity t JOIN t.trainerEntities tr2 WHERE t.user.userName = :traineeUsername)", TrainerEntity.class);
         query.setParameter("traineeUsername", traineeUsername);
         return query.getResultList();
     }
 
     @Override
-    public void updateTrainersList(Trainee trainee, List<Trainer> trainers) {
-        Trainee managedTrainee = entityManager.merge(trainee);
+    public void updateTrainersList(TraineeEntity traineeEntity, List<TrainerEntity> trainerEntities) {
+        TraineeEntity managedTraineeEntity = entityManager.merge(traineeEntity);
 
-        for (Trainer currentTrainer : new HashSet<>(managedTrainee.getTrainers())) {
-            currentTrainer.getTrainees().remove(managedTrainee);
+        for (TrainerEntity currentTrainerEntity : new HashSet<>(managedTraineeEntity.getTrainerEntities())) {
+            currentTrainerEntity.getTraineeEntities().remove(managedTraineeEntity);
         }
-        managedTrainee.getTrainers().clear();
+        managedTraineeEntity.getTrainerEntities().clear();
 
-        for (Trainer trainer : trainers) {
-            Trainer managedTrainer = entityManager.merge(trainer);
-            managedTrainer.getTrainees().add(managedTrainee);
-            managedTrainee.getTrainers().add(managedTrainer);
+        for (TrainerEntity trainerEntity : trainerEntities) {
+            TrainerEntity managedTrainerEntity = entityManager.merge(trainerEntity);
+            managedTrainerEntity.getTraineeEntities().add(managedTraineeEntity);
+            managedTraineeEntity.getTrainerEntities().add(managedTrainerEntity);
         }
     }
 
-    private void detachFromAssignedTrainers(Trainee trainee) {
-        for (Trainer trainer : trainee.getTrainers()) {
-            trainer.getTrainees().remove(trainee);
+    private void detachFromAssignedTrainers(TraineeEntity traineeEntity) {
+        for (TrainerEntity trainerEntity : traineeEntity.getTrainerEntities()) {
+            trainerEntity.getTraineeEntities().remove(traineeEntity);
         }
-        trainee.getTrainers().clear();
+        traineeEntity.getTrainerEntities().clear();
     }
 }
